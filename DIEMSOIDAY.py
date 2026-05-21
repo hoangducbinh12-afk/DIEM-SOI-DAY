@@ -22,30 +22,38 @@ def load_ocr():
     return easyocr.Reader(['en'])
 reader = load_ocr()
 
+# --- QUY LUẬT BIẾN ĐỔI BIT (CỐ ĐỊNH THEO STT KỲ) ---
 def get_wire_number(wire_id, k):
     step = 13 
+    # Mỗi dây wire_id ở kỳ k sẽ tạo ra một số vỏ (00-99)
     return f"{(wire_id + k * step) % 100:02d}"
 
 # --- THUẬT TOÁN TRUY VẾT 27 LỚP ĐỘC LẬP ---
 def calculate_matrix_convergence(v_loto, current_stt):
+    # Luôn khởi tạo đủ 100 số với điểm 0
     total_scores = {f"{i:02d}": 0 for i in range(100)}
+    
     if not v_loto:
         return total_scores
 
-    # Quét 27 lần tương ứng với 27 số về
-    for hit_num in v_loto:
-        for wire_id in range(TOTAL_WIRES):
-            # Tìm dây tạo ra số nổ ở kỳ này (current_stt)
-            if get_wire_number(wire_id, current_stt) == hit_num:
-                # Phóng tới kỳ sau (current_stt + 1)
-                num_next = get_wire_number(wire_id, current_stt + 1)
-                total_scores[num_next] += 1
+    # CHUẨN HÓA: Duyệt qua toàn bộ 11.449 dây MỘT LẦN DUY NHẤT để tối ưu hiệu năng
+    # Nhưng kiểm tra xem dây đó có tạo ra BẤT KỲ con số nào trong 27 số nổ không
+    for wire_id in range(TOTAL_WIRES):
+        # Số mà dây này tạo ra ở kỳ vừa rồi
+        num_last = get_wire_number(wire_id, current_stt)
+        
+        # Nếu dây này là "nguồn phát" (tạo ra 1 trong 27 số nổ)
+        if num_last in v_loto:
+            # Xác định số nó sẽ tạo ra ở kỳ kế tiếp
+            num_next = get_wire_number(wire_id, current_stt + 1)
+            # Cộng điểm hội tụ (Số dây hội tụ)
+            total_scores[num_next] += 1
                 
     return total_scores
 
 # --- 2. GIAO DIỆN ---
-st.set_page_config(page_title="Matrix 11.449 Independence", layout="wide")
-st.title("⚡ MATRIX 11.449 - TRUY VẾT ĐỐI SOÁT CHUẨN")
+st.set_page_config(page_title="Matrix 11.449 Fix", layout="wide")
+st.title("⚡ MATRIX 11.449 - TRUY VẾT HỘI TỤ ĐIỂM")
 
 with st.sidebar:
     st.header("📂 HỆ THỐNG")
@@ -63,19 +71,22 @@ with st.sidebar:
             st.session_state['gdb_val'] = nums[0][-2:]
         st.rerun()
 
-    st.session_state['raw_input'] = st.text_area("27 giải:", value=st.session_state['raw_input'], height=150)
-    st.session_state['gdb_val'] = st.text_input("GĐB:", value=st.session_state['gdb_val'], max_chars=2)
+    st.session_state['raw_input'] = st.text_area("Nhập 27 giải kỳ này:", value=st.session_state['raw_input'], height=150)
+    st.session_state['gdb_val'] = st.text_input("GĐB kỳ này:", value=st.session_state['gdb_val'], max_chars=2)
 
     if st.button("🔥 CHẠY ĐỐI SOÁT & TRUY VẾT"):
         raw_list = [x.strip() for x in st.session_state['raw_input'].replace(",", " ").split() if x]
         v_loto_now = [n[-2:] for n in raw_list[:27]]
         current_stt = len(st.session_state['db']['history']) + 1
         
-        # --- BƯỚC 1: ĐỐI SOÁT LỊCH SỬ (Dựa trên dữ liệu đang có trong máy) ---
+        # --- BƯỚC 1: ĐỐI SOÁT LỊCH SỬ (Trước khi thay máu điểm) ---
         rank_val = "-"
         last_top10, last_10nhi, last_7ba, last_vungne = [], [], [], []
         
-        old_scores = st.session_state['db'].get('final_scores', {})
+        # Lấy bảng điểm cũ đang lưu trong session
+        old_scores = st.session_state['db'].get('final_scores', {f"{i:02d}": 0 for i in range(100)})
+        
+        # Nếu bảng cũ có dữ liệu (không phải toàn 0) thì mới tính Rank
         if sum(old_scores.values()) > 0:
             df_old = pd.DataFrame(list(old_scores.items()), columns=['Số', 'Điểm']).sort_values(by='Điểm', ascending=False).reset_index(drop=True)
             try: rank_val = df_old[df_old['Số'] == st.session_state['gdb_val']].index[0]
@@ -85,10 +96,10 @@ with st.sidebar:
             last_7ba = df_old.iloc[20:27]['Số'].tolist()
             last_vungne = df_old.tail(20)['Số'].tolist()
 
-        # --- BƯỚC 2: TÍNH DỰ BÁO MỚI CHO KỲ TIẾP THEO (Reset & Quét lại từ đầu) ---
+        # --- BƯỚC 2: TÍNH DỰ BÁO MỚI (Reset toàn bộ và Quét 11.449 dây) ---
         new_scores = calculate_matrix_convergence(v_loto_now, current_stt)
         
-        # --- BƯỚC 3: LƯU LỊCH SỬ VÀ CẬP NHẬT BẢNG ĐIỂM MỚI ---
+        # --- BƯỚC 3: LƯU LỊCH SỬ ---
         def get_hit_str(targets, results):
             if not targets: return "0"
             hits = [n for n in targets if n in results]
@@ -98,7 +109,7 @@ with st.sidebar:
         res = {
             "STT": current_stt,
             "GĐB": st.session_state['gdb_val'],
-            "Hạng": rank_val,
+            "Hạng GĐB": rank_val,
             "Top 10": get_hit_str(last_top10, v_loto_now),
             "10 Nhì": get_hit_str(last_10nhi, v_loto_now),
             "7 Ba": get_hit_str(last_7ba, v_loto_now),
@@ -110,22 +121,26 @@ with st.sidebar:
         st.rerun()
 
 # --- 3. HIỂN THỊ ---
+# Hiển thị bảng 100 số
 if st.session_state['db'].get('final_scores'):
     c1, c2 = st.columns([1, 2])
     with c1:
-        st.subheader("📊 MẬT ĐỘ DÂY KỲ TIẾP")
-        df_show = pd.DataFrame(list(st.session_state['db']['final_scores'].items()), columns=['Số', 'Điểm'])
+        st.subheader("📊 TỔNG ĐIỂM DÂY HỘI TỤ")
+        # Đảm bảo lấy đúng final_scores từ db
+        display_data = st.session_state['db']['final_scores']
+        df_show = pd.DataFrame(list(display_data.items()), columns=['Số', 'Điểm'])
+        # Sắp xếp từ cao xuống thấp
         df_show = df_show.sort_values(by='Điểm', ascending=False).reset_index(drop=True)
-        st.dataframe(df_show, use_container_width=True, height=550)
+        st.dataframe(df_show, use_container_width=True, height=600)
 
     with c2:
-        st.subheader("📜 LỊCH SỬ TRUY VẾT")
+        st.subheader("📜 LỊCH SỬ ĐỐI SOÁT")
         if st.session_state['db']['history']:
             st.table(pd.DataFrame(st.session_state['db']['history']))
         
         st.divider()
-        st.subheader("🎯 DÀN QUÂN DỰ BÁO")
+        st.subheader("🎯 DÀN QUÂN DỰ BÁO KỲ TỚI")
         num = st.number_input("Số lượng lấy:", 1, 100, 10)
         st.code(", ".join(df_show.head(num)['Số'].tolist()))
         
-        st.download_button("💾 XUẤT JSON", data=json.dumps(st.session_state['db']), file_name="matrix_trace_final.json")
+        st.download_button("💾 XUẤT JSON", data=json.dumps(st.session_state['db']), file_name="matrix_final_trace.json")
