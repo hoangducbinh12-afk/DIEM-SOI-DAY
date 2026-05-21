@@ -9,8 +9,13 @@ from PIL import Image
 BIT_COUNT = 107
 TOTAL_WIRES = BIT_COUNT * BIT_COUNT # 11.449 dây
 
+# Khởi tạo kho lưu trữ nếu chưa có
 if 'db' not in st.session_state:
-    st.session_state['db'] = {"last_loto": [], "history": [], "final_counts": {}}
+    st.session_state['db'] = {
+        "last_loto": [],      # Lưu 27 số của kỳ vừa nhập để làm trạm phát cho kỳ sau
+        "history": [],        # Lưu lịch sử đối soát
+        "final_counts": {f"{i:02d}": 0 for i in range(100)} # Mặc định bằng 0
+    }
 if 'raw_input' not in st.session_state: st.session_state['raw_input'] = ""
 if 'gdb_val' not in st.session_state: st.session_state['gdb_val'] = ""
 
@@ -19,51 +24,50 @@ def load_ocr():
     return easyocr.Reader(['en'])
 reader = load_ocr()
 
-# --- THUẬT TOÁN BIẾN ĐỔI BIT & HỘI TỤ DÂY ---
+# --- THUẬT TOÁN BIẾN ĐỔI BIT ---
 def get_wire_number(wire_id, k):
     """
-    Hàm xác định số mà sợi dây tạo ra ở kỳ thứ k.
-    Sử dụng thuật toán dịch Bit để đảm bảo qua mỗi kỳ dây sẽ tạo ra số khác.
+    Xác định con số sợi dây tạo ra tại kỳ thứ k.
+    Công thức dịch Bit: (Vị trí gốc + STT kỳ * Bước nhảy) % 100
     """
-    # Mô phỏng: Số tạo ra = (Vị trí gốc của dây + k * Bước nhảy Bit) % 100
-    # k ở đây là số thứ tự kỳ (STT) để đảm bảo tính biến đổi
-    step = 13 # Bước nhảy Bit cố định của ma trận
+    step = 13 # Bước nhảy ma trận
     return f"{(wire_id + k * step) % 100:02d}"
 
-def calculate_convergence(v_loto, current_stt):
+def calculate_convergence(last_loto, current_stt):
     """
-    Thuật toán chủ chốt: 
-    1. Tìm dây tạo ra 27 số loto ở kỳ vừa rồi (k-1)
-    2. Xem kỳ này (k) những dây đó tạo ra số gì
-    3. Tổng hợp mật độ
+    Truy vết: Lấy 27 số kỳ trước, tìm dây tạo ra chúng, 
+    xem kỳ này các dây đó hội tụ về số nào.
     """
     prediction_map = {f"{i:02d}": 0 for i in range(100)}
+    if not last_loto:
+        return prediction_map # Nếu chưa có kỳ trước thì trả về toàn 0
+
     last_stt = current_stt - 1
-    
-    # Duyệt qua 11.449 sợi dây
+    # Duyệt 11.449 sợi dây
     for wire_id in range(TOTAL_WIRES):
         # Số mà dây này tạo ra ở kỳ TRƯỚC
         num_last_period = get_wire_number(wire_id, last_stt)
         
-        # Nếu dây này đã nổ (nằm trong 27 số kỳ trước)
-        if num_last_period in v_loto:
-            # Thì xem kỳ NÀY nó tạo ra số gì
+        # Nếu số đó nằm trong danh sách 27 số đã về kỳ trước
+        if num_last_period in last_loto:
+            # Xem kỳ NÀY dây đó tạo ra số gì
             num_this_period = get_wire_number(wire_id, current_stt)
-            # Cộng dồn vào bảng mật độ
             prediction_map[num_this_period] += 1
             
     return prediction_map
 
 # --- 2. GIAO DIỆN ---
-st.set_page_config(page_title="Matrix 11.449 - Bit Transformation", layout="wide")
-st.title("⚡ MATRIX 11.449 - THUẬT TOÁN BIẾN ĐỔI BIT")
+st.set_page_config(page_title="Matrix 11.449 - Bit Trace", layout="wide")
+st.title("⚡ MATRIX 11.449 - TRUY VẾT BIẾN ĐỔI BIT")
 
 with st.sidebar:
-    st.header("📂 DỮ LIỆU")
-    load_file = st.file_uploader("📥 Nạp JSON", type=['json'])
+    st.header("📂 DỮ LIỆU ĐẦU VÀO")
+    
+    # Nạp file JSON
+    load_file = st.file_uploader("📥 Nạp dữ liệu (.json)", type=['json'])
     if load_file and st.button("XÁC NHẬN NẠP"):
-        data = json.load(load_file)
-        st.session_state['db'] = data
+        st.session_state['db'] = json.load(load_file)
+        st.success("Đã khôi phục ma trận!")
         st.rerun()
 
     if st.button("🚨 RESET ALL"):
@@ -71,40 +75,52 @@ with st.sidebar:
         st.rerun()
 
     st.divider()
-    st.session_state['raw_input'] = st.text_area("Nhập 27 giải kỳ này:", value=st.session_state['raw_input'], height=150)
+    # NÚT QUÉT ẢNH ĐÃ QUAY TRỞ LẠI
+    uploaded_img = st.file_uploader("📸 Quét ảnh kết quả", type=['jpg', 'jpeg', 'png'])
+    if uploaded_img and st.button("BẮT ĐẦU QUÉT OCR"):
+        with st.spinner("Đang đọc bảng kết quả..."):
+            img_pil = Image.open(uploaded_img)
+            results = reader.readtext(np.array(img_pil), detail=0)
+            nums = [n for n in results if n.isdigit() and 2 <= len(n) <= 5]
+            if nums:
+                st.session_state['raw_input'] = ", ".join(nums)
+                st.session_state['gdb_val'] = nums[0][-2:]
+        st.rerun()
+
+    st.session_state['raw_input'] = st.text_area("27 giải kỳ này:", value=st.session_state['raw_input'], height=120)
     st.session_state['gdb_val'] = st.text_input("GĐB kỳ này:", value=st.session_state['gdb_val'], max_chars=2)
 
-    if st.button("🔥 CHẠY BIẾN ĐỔI BIT"):
+    if st.button("🔥 CHẠY TRUY VẾT KỲ MỚI"):
+        # Xử lý input
         raw_list = [x.strip() for x in st.session_state['raw_input'].replace(",", " ").split() if x]
         v_loto_now = [n[-2:] for n in raw_list[:27]]
-        
-        # Lấy STT hiện tại
         current_stt = len(st.session_state['db']['history']) + 1
         
-        # 1. ĐỐI SOÁT LỊCH SỬ (Dựa trên dự báo của kỳ trước)
-        rank_gdb = "-"
+        # 1. ĐỐI SOÁT (Dựa trên dự báo của kỳ trước đã lưu trong final_counts)
+        rank_val = "-"
         last_top10 = []
         if st.session_state['db'].get('final_counts'):
-            old_counts = st.session_state['db']['final_counts']
-            old_df = pd.DataFrame(list(old_counts.items()), columns=['Số', 'Dây']).sort_values(by='Dây', ascending=False).reset_index(drop=True)
-            try: rank_gdb = old_df[old_df['Số'] == st.session_state['gdb_val']].index[0]
+            df_old = pd.DataFrame(list(st.session_state['db']['final_counts'].items()), columns=['Số', 'Dây'])
+            df_old = df_old.sort_values(by='Dây', ascending=False).reset_index(drop=True)
+            try: rank_val = df_old[df_old['Số'] == st.session_state['gdb_val']].index[0]
             except: pass
-            last_top10 = old_df.head(10)['Số'].tolist()
+            last_top10 = df_old.head(10)['Số'].tolist()
 
-        # 2. TÍNH TOÁN DỰ BÁO CHO KỲ TIẾP THEO (Dựa trên 27 số vừa nổ)
-        # Thuật toán: Dây tạo ra loto kỳ này -> Sẽ tạo ra số gì kỳ sau?
+        # 2. TRUY VẾT DÂY CHO KỲ TIẾP THEO
+        # Dùng 27 số vừa nổ (v_loto_now) để tìm dàn cho kỳ (current_stt + 1)
         new_counts = calculate_convergence(v_loto_now, current_stt + 1)
         
         # 3. LƯU LỊCH SỬ
-        def check_hits(target_list, results):
-            hits = [n for n in target_list if n in results]
-            return f"{len(hits)} ({','.join(hits)})" if hits else "0"
+        def get_hit_str(targets, results):
+            hits = [n for n in targets if n in results]
+            if not hits: return "0"
+            return f"{sum([results.count(n) for n in hits])} ({','.join(hits)})"
 
         res = {
             "STT": current_stt,
             "GĐB": st.session_state['gdb_val'],
-            "Hạng": rank_gdb,
-            "Top 10": check_hits(last_top10, v_loto_now)
+            "Hạng": rank_val,
+            "Top 10": get_hit_str(last_top10, v_loto_now)
         }
         st.session_state['db']['history'].append(res)
         st.session_state['db']['final_counts'] = new_counts
@@ -116,18 +132,18 @@ if st.session_state['db'].get('final_counts'):
     c1, c2 = st.columns([1, 2])
     
     with c1:
-        st.subheader("📊 MẬT ĐỘ DÂY HỘI TỤ (KỲ TIẾP)")
-        df = pd.DataFrame(list(st.session_state['db']['final_counts'].items()), columns=['Số', 'Số Dây'])
-        df = df.sort_values(by='Số Dây', ascending=False).reset_index(drop=True)
-        st.dataframe(df, use_container_width=True, height=550)
+        st.subheader("📊 MẬT ĐỘ DÂY HỘI TỤ")
+        df_show = pd.DataFrame(list(st.session_state['db']['final_counts'].items()), columns=['Số', 'Số Dây'])
+        df_show = df_show.sort_values(by='Số Dây', ascending=False).reset_index(drop=True)
+        st.dataframe(df_show, use_container_width=True, height=500)
 
     with c2:
-        st.subheader("📜 LỊCH SỬ ĐỐI SOÁT BIT")
+        st.subheader("📜 LỊCH SỬ TRUY VẾT BIT")
         st.table(pd.DataFrame(st.session_state['db']['history']))
         
         st.divider()
-        st.subheader("🎯 DÀN DỰ BÁO KỲ TỚI")
-        num = st.number_input("Lấy số lượng quân:", 1, 100, 10)
-        st.code(", ".join(df.head(num)['Số'].tolist()))
+        st.subheader("🎯 DÀN DỰ BÁO KỲ TIẾP THEO")
+        num = st.number_input("Số lượng quân:", 1, 100, 10)
+        st.code(", ".join(df_show.head(num)['Số'].tolist()))
         
-        st.download_button("💾 LƯU DỮ LIỆU MA TRẬN", data=json.dumps(st.session_state['db']), file_name="matrix_bit_transform.json")
+        st.download_button("💾 XUẤT JSON", data=json.dumps(st.session_state['db']), file_name="matrix_trace_bit.json")
