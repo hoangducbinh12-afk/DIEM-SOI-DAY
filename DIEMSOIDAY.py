@@ -6,11 +6,15 @@ import easyocr
 from PIL import Image
 
 # --- 1. KHỞI TẠO ---
-BIT_COUNT = 107
-TOTAL_WIRES = BIT_COUNT * BIT_COUNT # 11.449 dây
+# 107 vị trí chữ số từ 27 giải (MB chuẩn)
+# GĐB(5), G1(5), G2(10), G3(30), G4(16), G5(24), G6(9), G7(8) = 107
+TOTAL_POS = 107 
+TOTAL_WIRES = TOTAL_POS * TOTAL_POS # 11.449 dây
 
 if 'db' not in st.session_state:
     st.session_state['db'] = {
+        "last_digits": "",    # 107 chữ số kỳ trước
+        "last_loto": [],      # 27 con loto kỳ trước
         "history": [], 
         "final_scores": {f"{i:02d}": 0 for i in range(100)}
     }
@@ -22,40 +26,37 @@ def load_ocr():
     return easyocr.Reader(['en'])
 reader = load_ocr()
 
-# --- QUY LUẬT BIẾN ĐỔI BIT CẢI TIẾN ---
-def get_wire_number(wire_id, k):
-    """
-    Dùng phép nhân và dịch chuyển để đảm bảo tính phân tán của dây qua từng kỳ.
-    """
-    # Công thức này giúp 115 dây của cùng 1 số sẽ 'tỏa' ra nhiều hướng ở kỳ sau
-    prime_step = 131  # Dùng số nguyên tố để tăng độ phủ
-    return f"{((wire_id * prime_step) + k) % 100:02d}"
+# --- HÀM TRÍCH XUẤT 107 CHỮ SỐ ---
+def extract_data(raw_list):
+    # Lấy loto (2 số cuối của mỗi giải)
+    v_loto = [s[-2:] for s in raw_list[:27]]
+    # Lấy chuỗi 107 chữ số (ghép tất cả các giải lại)
+    all_digits = "".join(raw_list)
+    return all_digits[:TOTAL_POS], v_loto
 
-# --- THUẬT TOÁN TRUY VẾT 27 LỚP ---
-def calculate_matrix_convergence(v_loto, current_stt):
-    # Khởi tạo bảng điểm đủ 100 số
-    total_scores = {f"{i:02d}": 0 for i in range(100)}
-    
-    if not v_loto:
-        return total_scores
+# --- THUẬT TOÁN TRUY VẾT VỊ TRÍ TĨNH ---
+def calculate_convergence(old_digits, old_loto, current_digits):
+    scores = {f"{i:02d}": 0 for i in range(100)}
+    if not old_digits or not old_loto:
+        return scores
 
-    # Quét toàn bộ 11.449 sợi dây
-    for wire_id in range(TOTAL_WIRES):
-        # Tìm số mà dây này tạo ra ở kỳ VỪA NHẬP (STT hiện tại)
-        num_at_current = get_wire_number(wire_id, current_stt)
-        
-        # Nếu dây này là dây "thắng" (nằm trong 27 số vừa về)
-        if num_at_current in v_loto:
-            # Phóng tới kỳ TIẾP THEO (STT + 1)
-            num_at_next = get_wire_number(wire_id, current_stt + 1)
-            # Cộng dồn mật độ hội tụ
-            total_scores[num_at_next] += 1
+    # Duyệt qua 27 con loto đã về ở kỳ trước (Nguồn phát)
+    for win_num in old_loto:
+        # Tìm tất cả các cặp vị trí (i, j) đã tạo ra win_num ở kỳ trước
+        for i in range(TOTAL_POS):
+            for j in range(TOTAL_POS):
+                # Kết hợp chữ số tại vị trí i và j ở kỳ TRƯỚC
+                formed_old = old_digits[i] + old_digits[j]
                 
-    return total_scores
+                if formed_old == win_num:
+                    # Nếu đúng dây này đã ăn, xem kỳ NÀY nó tạo ra số gì
+                    formed_new = current_digits[i] + current_digits[j]
+                    scores[formed_new] += 1
+    return scores
 
 # --- 2. GIAO DIỆN ---
-st.set_page_config(page_title="Matrix 11.449 - Final Trace", layout="wide")
-st.title("⚡ MATRIX 11.449 - TRUY VẾT HỘI TỤ BIT")
+st.set_page_config(page_title="Matrix 11.449 Trace", layout="wide")
+st.title("⚡ MATRIX 11.449 - TRUY VẾT VỊ TRÍ TĨNH")
 
 with st.sidebar:
     st.header("📂 HỆ THỐNG")
@@ -73,60 +74,60 @@ with st.sidebar:
             st.session_state['gdb_val'] = nums[0][-2:]
         st.rerun()
 
-    st.session_state['raw_input'] = st.text_area("27 giải kỳ này:", value=st.session_state['raw_input'], height=150)
+    st.session_state['raw_input'] = st.text_area("Nhập 27 giải:", value=st.session_state['raw_input'], height=150)
     st.session_state['gdb_val'] = st.text_input("GĐB kỳ này:", value=st.session_state['gdb_val'], max_chars=2)
 
-    if st.button("🔥 CHẠY ĐỐI SOÁT & TRUY VẾT"):
+    if st.button("🔥 CHẠY TRUY VẾT"):
         raw_list = [x.strip() for x in st.session_state['raw_input'].replace(",", " ").split() if x]
-        v_loto_now = [n[-2:] for n in raw_list[:27]]
-        current_stt = len(st.session_state['db']['history']) + 1
-        
-        # --- BƯỚC 1: ĐỐI SOÁT LỊCH SỬ ---
-        rank_val = "-"
-        last_top10, last_10nhi, last_vungne = [], [], []
-        old_scores = st.session_state['db'].get('final_scores', {})
-        
-        if sum(old_scores.values()) > 0:
-            df_old = pd.DataFrame(list(old_scores.items()), columns=['Số', 'Điểm']).sort_values(by='Điểm', ascending=False).reset_index(drop=True)
-            try: rank_val = df_old[df_old['Số'] == st.session_state['gdb_val']].index[0]
-            except: pass
-            last_top10 = df_old.head(10)['Số'].tolist()
-            last_10nhi = df_old.iloc[10:20]['Số'].tolist()
-            last_vungne = df_old.tail(20)['Số'].tolist()
+        if len(raw_list) < 27:
+            st.error("Phải nhập đủ 27 giải!")
+        else:
+            curr_digits, curr_loto = extract_data(raw_list)
+            
+            # 1. TÍNH ĐIỂM HỘI TỤ CHO KỲ NÀY (Dựa trên Kỳ Trước)
+            new_scores = calculate_convergence(
+                st.session_state['db']['last_digits'], 
+                st.session_state['db']['last_loto'], 
+                curr_digits
+            )
+            
+            # 2. ĐỐI SOÁT LỊCH SỬ (Bảng điểm mới tính vs Kết quả vừa nhập)
+            df_new = pd.DataFrame(list(new_scores.items()), columns=['Số', 'Điểm']).sort_values(by='Điểm', ascending=False).reset_index(drop=True)
+            
+            rank_val = "-"
+            if sum(new_scores.values()) > 0:
+                try: rank_val = df_new[df_new['Số'] == st.session_state['gdb_val']].index[0]
+                except: pass
 
-        # --- BƯỚC 2: TRUY VẾT MỚI (Reset điểm cũ, tính lại từ đầu) ---
-        new_scores = calculate_matrix_convergence(v_loto_now, current_stt)
-        
-        # --- BƯỚC 3: CẬP NHẬT LỊCH SỬ ---
-        def get_hit_str(targets, results):
-            if not targets: return "0"
-            hits = [n for n in targets if n in results]
-            nhay = sum([results.count(n) for n in hits])
-            return f"{nhay} ({','.join(sorted(list(set(hits))))})" if hits else "0"
+            def get_hit_str(targets, results):
+                hits = [n for n in targets if n in results]
+                nhay = sum([results.count(n) for n in hits])
+                return f"{nhay} ({','.join(sorted(list(set(hits))))})" if hits else "0"
 
-        res = {
-            "STT": current_stt,
-            "GĐB": st.session_state['gdb_val'],
-            "Hạng GĐB": rank_val,
-            "Top 10": get_hit_str(last_top10, v_loto_now),
-            "10 Nhì": get_hit_str(last_10nhi, v_loto_now),
-            "Né": get_hit_str(last_vungne, v_loto_now)
-        }
-        
-        st.session_state['db']['history'].append(res)
-        st.session_state['db']['final_scores'] = new_scores
-        st.rerun()
+            res = {
+                "STT": len(st.session_state['db']['history']) + 1,
+                "GĐB": st.session_state['gdb_val'],
+                "Hạng": rank_val,
+                "Top 10": get_hit_str(df_new.head(10)['Số'].tolist(), curr_loto),
+                "10 Nhì": get_hit_str(df_new.iloc[10:20]['Số'].tolist(), curr_loto),
+                "7 Ba": get_hit_str(df_new.iloc[20:27]['Số'].tolist(), curr_loto),
+                "Né": get_hit_str(df_new.tail(20)['Số'].tolist(), curr_loto)
+            }
+            
+            # 3. CẬP NHẬT TRẠNG THÁI
+            st.session_state['db']['history'].append(res)
+            st.session_state['db']['final_scores'] = new_scores
+            st.session_state['db']['last_digits'] = curr_digits
+            st.session_state['db']['last_loto'] = curr_loto
+            st.rerun()
 
 # --- 3. HIỂN THỊ ---
 if st.session_state['db'].get('final_scores'):
     c1, c2 = st.columns([1, 2])
     with c1:
-        st.subheader("📊 TỔNG DÂY HỘI TỤ (KỲ TIẾP)")
-        # Lấy bảng điểm mới nhất
-        score_data = st.session_state['db']['final_scores']
-        df_show = pd.DataFrame(list(score_data.items()), columns=['Số', 'Số Dây'])
-        # Sắp xếp và Reset index để Hạng (Rank) chuẩn từ 0-99
-        df_show = df_show.sort_values(by='Số Dây', ascending=False).reset_index(drop=True)
+        st.subheader("📊 TỔNG DÂY HỘI TỤ")
+        df_show = pd.DataFrame(list(st.session_state['db']['final_scores'].items()), columns=['Số', 'Điểm'])
+        df_show = df_show.sort_values(by='Điểm', ascending=False).reset_index(drop=True)
         st.dataframe(df_show, use_container_width=True, height=600)
 
     with c2:
@@ -135,8 +136,6 @@ if st.session_state['db'].get('final_scores'):
             st.table(pd.DataFrame(st.session_state['db']['history']))
         
         st.divider()
-        st.subheader("🎯 DÀN QUÂN DỰ BÁO")
+        st.subheader("🎯 DÀN QUÂN THEO MẬT ĐỘ")
         num = st.number_input("Số lượng lấy:", 1, 100, 10)
         st.code(", ".join(df_show.head(num)['Số'].tolist()))
-        
-        st.download_button("💾 XUẤT JSON", data=json.dumps(st.session_state['db']), file_name="matrix_trace_final.json")
