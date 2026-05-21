@@ -5,7 +5,7 @@ import numpy as np
 import easyocr
 from PIL import Image
 
-# --- 1. KHỞI TẠO HỆ THỐNG ---
+# --- 1. KHỞI TẠO ---
 BIT_COUNT = 107
 TOTAL_WIRES = BIT_COUNT * BIT_COUNT 
 DEFAULT_SCORE = 100.0
@@ -22,62 +22,40 @@ if 'last_rank_info' not in st.session_state: st.session_state['last_rank_info'] 
 @st.cache_resource
 def load_ocr():
     return easyocr.Reader(['en'])
-
 reader = load_ocr()
 
 def update_matrix(db, loto_list, gdb_loto):
     actual_db = db.get('matrix', db) if isinstance(db.get('matrix'), dict) else db
     new_matrix = json.loads(json.dumps(actual_db))
     num_scores = {f"{i:02d}": 0.0 for i in range(100)}
-    
     for wire_id in range(TOTAL_WIRES):
-        w_str = str(wire_id)
-        if w_str not in new_matrix: continue
-        wire = new_matrix[w_str]
+        w_str = str(wire_id); wire = new_matrix[w_str]
         num_formed = f"{wire_id % 100:02d}"
-        is_hit = num_formed in loto_list
-        is_gdb = (num_formed == gdb_loto)
-        
+        is_hit = num_formed in loto_list; is_gdb = (num_formed == gdb_loto)
         if is_hit:
-            wire["streak_loss"] = 0
-            wire["streak_win"] += 1
+            wire["streak_loss"] = 0; wire["streak_win"] += 1
             if wire["streak_win"] <= 3:
                 if is_gdb: wire["score"] += 5.0
                 wire["score"] += float(loto_list.count(num_formed))
             else: wire["score"] -= 0.5
         else:
-            wire["streak_win"] = 0
-            wire["streak_loss"] += 1
+            wire["streak_win"] = 0; wire["streak_loss"] += 1
             if wire["streak_loss"] >= 4: wire["score"] += 0.5
         num_scores[num_formed] += wire["score"]
-        
     return new_matrix, num_scores
 
 # --- 2. GIAO DIỆN ---
 st.set_page_config(page_title="Matrix 11.449", layout="wide")
-st.title("⚡ MATRIX 11.449 - ĐỐI SOÁT VỊ TRÍ VƯƠNG GIẢ")
+st.markdown("<h2 style='text-align: center;'>⚡ MATRIX 11.449 - ĐỐI SOÁT CHUẨN XÁC</h2>", unsafe_allow_html=True)
 
 with st.sidebar:
-    st.header("📂 DỮ LIỆU ĐẦU VÀO")
-    
-    load_file = st.file_uploader("📥 Nạp dữ liệu cũ (.json)", type=['json'])
-    if load_file is not None:
-        if st.button("XÁC NHẬN NẠP FILE"):
-            try:
-                data = json.load(load_file)
-                if 'matrix' in data and 'last_gdb' in data:
-                    st.session_state['db'] = data['matrix']
-                    st.session_state['gdb_val'] = data['last_gdb']
-                    if 'history' in data: st.session_state['history'] = data['history']
-                    st.success(f"Đã nạp thành công kỳ {data['last_gdb']}")
-                else:
-                    st.session_state['db'] = data
-                    st.warning("File cũ không có GĐB.")
-            except: st.error("Lỗi file!")
-
-    st.divider()
-    if st.button("🚨 RESET ALL"):
-        st.session_state.clear() # Xóa sạch để khởi tạo lại
+    st.header("📂 DỮ LIỆU")
+    load_file = st.file_uploader("📥 Nạp JSON", type=['json'])
+    if load_file and st.button("XÁC NHẬN NẠP"):
+        data = json.load(load_file)
+        st.session_state['db'] = data.get('matrix', data)
+        st.session_state['gdb_val'] = data.get('last_gdb', "")
+        st.session_state['history'] = data.get('history', [])
         st.rerun()
 
     st.divider()
@@ -93,48 +71,53 @@ with st.sidebar:
     st.session_state['raw_input'] = st.text_area("27 giải:", value=st.session_state['raw_input'], height=100)
     st.session_state['gdb_val'] = st.text_input("GĐB Kỳ Này:", value=st.session_state['gdb_val'], max_chars=2)
 
-    if st.button("🔥 CHẠY MA TRẬN & LƯU"):
+    if st.button("🔥 CHẠY MA TRẬN"):
         raw_list = [x.strip() for x in st.session_state['raw_input'].replace(",", " ").split() if x]
         v_loto = [n[-2:] for n in raw_list[:27]]
         st.session_state['v_loto'] = v_loto
         
-        # TRƯỚC KHI CẬP NHẬT: Tìm vị trí của GĐB kỳ này trong bảng điểm CŨ (Kỳ trước)
-        if st.session_state['final_scores']:
-            old_df = pd.DataFrame(list(st.session_state['final_scores'].items()), columns=['Số', 'Điểm']).sort_values(by='Điểm', ascending=False).reset_index(drop=True)
-            try:
-                rank = old_df[old_df['Số'] == st.session_state['gdb_val']].index[0]
-                st.session_state['last_rank_info'] = f"GĐB {st.session_state['gdb_val']} nằm ở hạng {rank} kỳ trước."
-            except: st.session_state['last_rank_info'] = "Không tìm thấy hạng."
+        # LẤY BẢNG ĐIỂM CŨ (TRƯỚC KHI CẬP NHẬT) ĐỂ SOI HẠNG
+        if st.session_state['final_scores'] is not None:
+            old_scores = st.session_state['final_scores']
+        else:
+            # Nếu chưa có scores (mới reset), tính điểm từ db hiện tại
+            old_scores = {f"{i:02d}": sum(st.session_state['db'][str(j)]["score"] for j in range(TOTAL_WIRES) if j % 100 == i) for i in range(100)}
 
+        old_df = pd.DataFrame(list(old_scores.items()), columns=['Số', 'Điểm']).sort_values(by='Điểm', ascending=False).reset_index(drop=True)
+        
+        # Tìm hạng của con GĐB kỳ này
+        try:
+            rank_val = old_df[old_df['Số'] == st.session_state['gdb_val']].index[0]
+            st.session_state['last_rank_info'] = f"GĐB {st.session_state['gdb_val']} nằm ở hạng {rank_val} kỳ trước."
+        except: rank_val = "-"; st.session_state['last_rank_info'] = ""
+
+        # CẬP NHẬT MA TRẬN
         new_matrix, scores = update_matrix(st.session_state['db'], v_loto, st.session_state['gdb_val'])
         st.session_state['db'] = new_matrix
         st.session_state['final_scores'] = scores
         
-        # Cập nhật lịch sử
-        df_temp = pd.DataFrame(list(scores.items()), columns=['Số', 'Điểm']).sort_values(by='Điểm', ascending=False)
+        # HÀM ĐẾM NHÁY DỰA TRÊN DÀN CỦA KỲ TRƯỚC
         def get_hit_info(target_nums, result_list):
             hits = [n for n in target_nums if n in result_list]
-            nhay = sum([result_list.count(n) for n in hits]); no = sorted(list(set(hits)))
-            return f"{nhay} ({','.join(no)})"
+            nhay = sum([result_list.count(n) for n in hits])
+            no = sorted(list(set(hits)))
+            return f"{nhay} ({','.join(no)})" if nhay > 0 else "0"
 
-        # Lấy Rank để cho vào bảng lịch sử
-        current_rank = "-"
-        if st.session_state['last_rank_info']: current_rank = st.session_state['last_rank_info'].split("hạng ")[1].split(" kỳ")[0]
-
+        # LƯU LỊCH SỬ (Dùng dàn số của KỲ TRƯỚC để đối soát nháy nổ kỳ này)
         res = {
             "STT": len(st.session_state['history']) + 1,
             "GĐB": st.session_state['gdb_val'],
-            "Hạng": current_rank,
-            "Top 10": get_hit_info(df_temp.head(10)['Số'].tolist(), v_loto),
-            "10 Nhì": get_hit_info(df_temp.iloc[10:20]['Số'].tolist(), v_loto),
-            "7 Ba": get_hit_info(df_temp.iloc[20:27]['Số'].tolist(), v_loto),
-            "20 Né": get_hit_info(df_temp.tail(20)['Số'].tolist(), v_loto)
+            "Hạng": rank_val,
+            "Top 10": get_hit_info(old_df.head(10)['Số'].tolist(), v_loto),
+            "10 Nhì": get_hit_info(old_df.iloc[10:20]['Số'].tolist(), v_loto),
+            "7 Ba": get_hit_info(old_df.iloc[20:27]['Số'].tolist(), v_loto),
+            "20 Né": get_hit_info(old_df.tail(20)['Số'].tolist(), v_loto)
         }
         st.session_state['history'].append(res)
 
 # --- 3. HIỂN THỊ ---
 if st.session_state['final_scores']:
-    c_left, c_right = st.columns([1.1, 1.9])
+    c_left, c_right = st.columns([1, 2])
     with c_left:
         st.subheader("📊 BẢNG 100 SỐ")
         df_display = pd.DataFrame(list(st.session_state['final_scores'].items()), columns=['Số', 'Điểm'])
@@ -144,14 +127,13 @@ if st.session_state['final_scores']:
 
     with c_right:
         st.subheader("📜 LỊCH SỬ ĐỐI SOÁT")
-        if st.session_state['last_rank_info']:
-            st.warning(st.session_state['last_rank_info'])
+        if st.session_state['last_rank_info']: st.warning(st.session_state['last_rank_info'])
         st.table(pd.DataFrame(st.session_state['history']))
         
         st.divider()
         st.subheader("🎯 TRÍCH XUẤT QUÂN")
-        num_pick = st.number_input("Lấy số lượng:", 1, 100, 10)
+        num_pick = st.number_input("Số lượng:", 1, 100, 10)
         st.code(", ".join(df_display.head(num_pick)['Số'].tolist()))
         
         save_data = {"matrix": st.session_state['db'], "last_gdb": st.session_state['gdb_val'], "history": st.session_state['history']}
-        st.download_button("💾 XUẤT JSON", data=json.dumps(save_data), file_name="matrix_full.json")
+        st.download_button("💾 XUẤT JSON", data=json.dumps(save_data), file_name="matrix_final.json")
