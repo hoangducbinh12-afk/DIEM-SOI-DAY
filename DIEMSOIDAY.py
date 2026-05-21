@@ -42,8 +42,8 @@ def calculate_convergence(old_digits, old_loto, current_digits):
     return scores
 
 # --- 2. GIAO DIỆN ---
-st.set_page_config(page_title="Matrix Trace Final", layout="wide")
-st.title("⚡ MATRIX 11.449 - TRUY VẾT & PHÂN VÙNG LỊCH SỬ")
+st.set_page_config(page_title="Matrix Trace Pro V4", layout="wide")
+st.title("⚡ MATRIX 11.449 - TRUY VẾT & PHÂN LỚP CHI TIẾT")
 
 with st.sidebar:
     st.header("📂 HỆ THỐNG")
@@ -71,21 +71,28 @@ with st.sidebar:
         else:
             curr_digits, curr_loto = extract_data(raw_list)
             
-            # --- BƯỚC 1: ĐỐI SOÁT LỊCH SỬ CHUẨN THEO HẠNG KỲ TRƯỚC ---
+            # --- BƯỚC 1: ĐỐI SOÁT LỊCH SỬ THEO PHÂN LỚP MỚI ---
             old_scores = st.session_state['db']['final_scores']
             df_old = pd.DataFrame(list(old_scores.items()), columns=['Số', 'Điểm']).sort_values(by='Điểm', ascending=False).reset_index(drop=True)
             
             rank_val = "-"
-            l_top10, l_10nhi, l_top7, l_ne, l_loai = [], [], [], [], []
+            # Danh sách các nhóm hạng
+            groups = {
+                "Top 4": [], "Top 10": [], "Top 15": [], "Top 20": [], 
+                "Top 27": [], "Né": [], "Loại": [], "Cao": []
+            }
             
             if df_old['Điểm'].sum() > 0:
                 try: rank_val = df_old[df_old['Số'] == st.session_state['gdb_val']].index[0]
                 except: pass
-                l_top10 = df_old.iloc[0:10]['Số'].tolist()
-                l_10nhi = df_old.iloc[10:20]['Số'].tolist()
-                l_top7  = df_old.iloc[20:27]['Số'].tolist()
-                l_ne    = df_old.iloc[80:90]['Số'].tolist()
-                l_loai  = df_old.iloc[90:100]['Số'].tolist()
+                groups["Top 4"]  = df_old.iloc[0:4]['Số'].tolist()
+                groups["Top 10"] = df_old.iloc[4:10]['Số'].tolist()
+                groups["Top 15"] = df_old.iloc[10:15]['Số'].tolist()
+                groups["Top 20"] = df_old.iloc[15:20]['Số'].tolist()
+                groups["Top 27"] = df_old.iloc[20:27]['Số'].tolist()
+                groups["Né"]     = df_old.iloc[80:90]['Số'].tolist()
+                groups["Loại"]   = df_old.iloc[90:95]['Số'].tolist()
+                groups["Cao"]    = df_old.iloc[95:100]['Số'].tolist()
 
             def get_hit_str(targets, results):
                 if not targets: return "0"
@@ -97,14 +104,17 @@ with st.sidebar:
                 "STT": len(st.session_state['db']['history']) + 1,
                 "GĐB": st.session_state['gdb_val'],
                 "Hạng": rank_val,
-                "Top 10": get_hit_str(l_top10, curr_loto),
-                "10 Nhì": get_hit_str(l_10nhi, curr_loto),
-                "Top 7": get_hit_str(l_top7, curr_loto),
-                "Né (80-89)": get_hit_str(l_ne, curr_loto),
-                "Loại (90-99)": get_hit_str(l_loai, curr_loto)
+                "Top 4": get_hit_str(groups["Top 4"], curr_loto),
+                "Top 10": get_hit_str(groups["Top 10"], curr_loto),
+                "Top 15": get_hit_str(groups["Top 15"], curr_loto),
+                "Top 20": get_hit_str(groups["Top 20"], curr_loto),
+                "Top 27": get_hit_str(groups["Top 27"], curr_loto),
+                "Né (80-89)": get_hit_str(groups["Né"], curr_loto),
+                "Loại (90-94)": get_hit_str(groups["Loại"], curr_loto),
+                "Cao (95-99)": get_hit_str(groups["Cao"], curr_loto)
             }
 
-            # --- BƯỚC 2: TÍNH TOÁN DÀN ĐIỂM MỚI ---
+            # --- BƯỚC 2: TÍNH TOÁN DÀN ĐIỂM CHO KỲ TIẾP ---
             new_scores = calculate_convergence(
                 st.session_state['db']['last_digits'], 
                 st.session_state['db']['last_loto'], 
@@ -119,7 +129,7 @@ with st.sidebar:
 
 # --- 3. HIỂN THỊ ---
 if st.session_state['db'].get('final_scores'):
-    c1, c2 = st.columns([1, 2.5]) # Tăng độ rộng cột lịch sử để hiện đủ bảng
+    c1, c2 = st.columns([1, 3]) # Mở rộng cột lịch sử tối đa
     with c1:
         st.subheader("📊 DỰ BÁO KỲ TIẾP")
         df_show = pd.DataFrame(list(st.session_state['db']['final_scores'].items()), columns=['Số', 'Điểm'])
@@ -127,13 +137,15 @@ if st.session_state['db'].get('final_scores'):
         st.dataframe(df_show, use_container_width=True, height=600)
 
     with c2:
-        st.subheader("📜 LỊCH SỬ ĐỐI SOÁT")
+        st.subheader("📜 LỊCH SỬ PHÂN LỚP")
         if st.session_state['db']['history']:
             st.table(pd.DataFrame(st.session_state['db']['history']))
         
         st.divider()
-        st.subheader("🎯 DÀN QUÂN DỰ BÁO")
-        num = st.number_input("Số lượng lấy:", 1, 100, 10)
-        st.code(", ".join(df_show.head(num)['Số'].tolist()))
+        st.subheader("🎯 LẤY DÀN NHANH")
+        col_btn1, col_btn2 = st.columns(2)
+        with col_btn1:
+            num = st.number_input("Số lượng quân đầu bảng:", 1, 100, 4)
+            st.code(", ".join(df_show.head(num)['Số'].tolist()))
         
-        st.download_button("💾 XUẤT JSON", data=json.dumps(st.session_state['db']), file_name="matrix_pro_v3.json")
+        st.download_button("💾 LƯU DỮ LIỆU", data=json.dumps(st.session_state['db']), file_name="matrix_trace_v4.json")
