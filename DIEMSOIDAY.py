@@ -7,7 +7,7 @@ from PIL import Image
 
 # --- 1. KHỞI TẠO ---
 TOTAL_POS = 107 
-TOTAL_WIRES = TOTAL_POS * TOTAL_POS # 11.449 dây
+TOTAL_WIRES = TOTAL_POS * TOTAL_POS 
 
 if 'db' not in st.session_state:
     st.session_state['db'] = {
@@ -29,9 +29,6 @@ def extract_data(raw_list):
     all_digits = "".join(raw_list)
     return all_digits[:TOTAL_POS], v_loto
 
-def get_wire_number(d, i, j):
-    return d[i] + d[j]
-
 def calculate_convergence(old_digits, old_loto, current_digits):
     scores = {f"{i:02d}": 0 for i in range(100)}
     if not old_digits or not old_loto:
@@ -39,14 +36,14 @@ def calculate_convergence(old_digits, old_loto, current_digits):
     for win_num in old_loto:
         for i in range(TOTAL_POS):
             for j in range(TOTAL_POS):
-                if get_wire_number(old_digits, i, j) == win_num:
-                    formed_new = get_wire_number(current_digits, i, j)
+                if (old_digits[i] + old_digits[j]) == win_num:
+                    formed_new = current_digits[i] + current_digits[j]
                     scores[formed_new] += 1
     return scores
 
 # --- 2. GIAO DIỆN ---
-st.set_page_config(page_title="Matrix Trace Fix", layout="wide")
-st.title("⚡ MATRIX 11.449 - ĐỐI SOÁT LỊCH SỬ CHUẨN")
+st.set_page_config(page_title="Matrix Trace Final", layout="wide")
+st.title("⚡ MATRIX 11.449 - TRUY VẾT & PHÂN VÙNG LỊCH SỬ")
 
 with st.sidebar:
     st.header("📂 HỆ THỐNG")
@@ -74,20 +71,21 @@ with st.sidebar:
         else:
             curr_digits, curr_loto = extract_data(raw_list)
             
-            # --- BƯỚC 1: ĐỐI SOÁT LỊCH SỬ (Dựa trên bảng điểm đang hiện trên màn hình - tức là dự báo từ kỳ trước) ---
+            # --- BƯỚC 1: ĐỐI SOÁT LỊCH SỬ CHUẨN THEO HẠNG KỲ TRƯỚC ---
             old_scores = st.session_state['db']['final_scores']
             df_old = pd.DataFrame(list(old_scores.items()), columns=['Số', 'Điểm']).sort_values(by='Điểm', ascending=False).reset_index(drop=True)
             
             rank_val = "-"
-            last_top10, last_10nhi, last_7ba, last_vungne = [], [], [], []
+            l_top10, l_10nhi, l_top7, l_ne, l_loai = [], [], [], [], []
             
             if df_old['Điểm'].sum() > 0:
                 try: rank_val = df_old[df_old['Số'] == st.session_state['gdb_val']].index[0]
                 except: pass
-                last_top10 = df_old.head(10)['Số'].tolist()
-                last_10nhi = df_old.iloc[10:20]['Số'].tolist()
-                last_7ba = df_old.iloc[20:27]['Số'].tolist()
-                last_vungne = df_old.tail(20)['Số'].tolist()
+                l_top10 = df_old.iloc[0:10]['Số'].tolist()
+                l_10nhi = df_old.iloc[10:20]['Số'].tolist()
+                l_top7  = df_old.iloc[20:27]['Số'].tolist()
+                l_ne    = df_old.iloc[80:90]['Số'].tolist()
+                l_loai  = df_old.iloc[90:100]['Số'].tolist()
 
             def get_hit_str(targets, results):
                 if not targets: return "0"
@@ -99,20 +97,20 @@ with st.sidebar:
                 "STT": len(st.session_state['db']['history']) + 1,
                 "GĐB": st.session_state['gdb_val'],
                 "Hạng": rank_val,
-                "Top 10": get_hit_str(last_top10, curr_loto),
-                "10 Nhì": get_hit_str(last_10nhi, curr_loto),
-                "Top 7": get_hit_str(last_7ba, curr_loto),
-                "Né": get_hit_str(last_vungne, curr_loto)
+                "Top 10": get_hit_str(l_top10, curr_loto),
+                "10 Nhì": get_hit_str(l_10nhi, curr_loto),
+                "Top 7": get_hit_str(l_top7, curr_loto),
+                "Né (80-89)": get_hit_str(l_ne, curr_loto),
+                "Loại (90-99)": get_hit_str(l_loai, curr_loto)
             }
 
-            # --- BƯỚC 2: TÍNH TOÁN DÀN ĐIỂM MỚI (Cho kỳ tiếp theo) ---
+            # --- BƯỚC 2: TÍNH TOÁN DÀN ĐIỂM MỚI ---
             new_scores = calculate_convergence(
                 st.session_state['db']['last_digits'], 
                 st.session_state['db']['last_loto'], 
                 curr_digits
             )
             
-            # --- BƯỚC 3: CẬP NHẬT TRẠNG THÁI ---
             st.session_state['db']['history'].append(res)
             st.session_state['db']['final_scores'] = new_scores
             st.session_state['db']['last_digits'] = curr_digits
@@ -121,9 +119,9 @@ with st.sidebar:
 
 # --- 3. HIỂN THỊ ---
 if st.session_state['db'].get('final_scores'):
-    c1, c2 = st.columns([1, 2])
+    c1, c2 = st.columns([1, 2.5]) # Tăng độ rộng cột lịch sử để hiện đủ bảng
     with c1:
-        st.subheader("📊 DỰ BÁO KỲ TIẾP THEO")
+        st.subheader("📊 DỰ BÁO KỲ TIẾP")
         df_show = pd.DataFrame(list(st.session_state['db']['final_scores'].items()), columns=['Số', 'Điểm'])
         df_show = df_show.sort_values(by='Điểm', ascending=False).reset_index(drop=True)
         st.dataframe(df_show, use_container_width=True, height=600)
@@ -134,6 +132,8 @@ if st.session_state['db'].get('final_scores'):
             st.table(pd.DataFrame(st.session_state['db']['history']))
         
         st.divider()
-        st.subheader("🎯 DÀN QUÂN LẤY THEO HẠNG")
+        st.subheader("🎯 DÀN QUÂN DỰ BÁO")
         num = st.number_input("Số lượng lấy:", 1, 100, 10)
         st.code(", ".join(df_show.head(num)['Số'].tolist()))
+        
+        st.download_button("💾 XUẤT JSON", data=json.dumps(st.session_state['db']), file_name="matrix_pro_v3.json")
