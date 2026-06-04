@@ -6,7 +6,7 @@ import easyocr
 from PIL import Image
 
 # --- 1. CẤU HÌNH ---
-st.set_page_config(page_title="Matrix V7.8 - Full Transparency", layout="wide")
+st.set_page_config(page_title="Matrix V7.9 - Full Verification", layout="wide")
 TOTAL_POS = 107 
 
 if 'db' not in st.session_state:
@@ -18,12 +18,14 @@ if 'db' not in st.session_state:
         "last_predictions": {} 
     }
 if 'raw_input' not in st.session_state: st.session_state['raw_input'] = ""
+if 'gdb_ocr' not in st.session_state: st.session_state['gdb_ocr'] = ""
+if 'loto_list_display' not in st.session_state: st.session_state['loto_list_display'] = []
 
 @st.cache_resource
 def load_ocr():
     return easyocr.Reader(['en'])
 
-# --- 2. LOGIC NÂNG CẤP: ĐỘC NHẤT NỘI BỘ MỨC ĐIỂM ---
+# --- 2. LOGIC NÂNG CẤP ---
 
 def process_matrix(current_digits, current_loto, gdb_val):
     db = st.session_state['db']
@@ -37,7 +39,6 @@ def process_matrix(current_digits, current_loto, gdb_val):
     hit_report = {"STT": len(db['history']) + 1, "GĐB": gdb_val}
     if old_preds:
         for lv, pred_nums in old_preds.items():
-            # Lấy danh sách những con nổ thực tế trong dàn
             found_hits = []
             for n in pred_nums:
                 count = current_loto.count(n)
@@ -63,7 +64,7 @@ def process_matrix(current_digits, current_loto, gdb_val):
     new_preds = {}
     if len(current_digits) >= TOTAL_POS:
         max_s = int(wire_scores.max())
-        for s in range(1, max_s + 1): # Duyệt qua từng mức điểm
+        for s in range(1, max_s + 1):
             coords = np.argwhere(wire_scores == s)
             if len(coords) == 0: continue
             
@@ -72,10 +73,7 @@ def process_matrix(current_digits, current_loto, gdb_val):
                 num = current_digits[r] + current_digits[c]
                 level_map[num] = level_map.get(num, 0) + 1
             
-            # CHỈ LỌC ĐỘC NHẤT NỘI BỘ MỨC S
-            # (Nếu mức 1 có 39 và mức 7 có 39, cả hai đều giữ nếu chúng là duy nhất trong mức đó)
             isolated = [n for n, count in level_map.items() if count == 1]
-            
             if isolated:
                 new_preds[s] = sorted(isolated)
 
@@ -87,27 +85,34 @@ def process_matrix(current_digits, current_loto, gdb_val):
     st.session_state['db']['history'].insert(0, hit_report)
 
 # --- 3. GIAO DIỆN ---
-st.title("⚡ MATRIX V7.8: FULL TRANSPARENCY")
+st.markdown("<h1 style='text-align: center; color: #00FFAA;'>⚡ MATRIX V7.9: FULL VERIFICATION</h1>", unsafe_allow_html=True)
 
 with st.sidebar:
     st.header("📸 NHẬP DỮ LIỆU")
-    uploaded_img = st.file_uploader("Quét bảng KQ", type=['jpg', 'png', 'jpeg'])
+    uploaded_img = st.file_uploader("Quét ảnh bảng KQ", type=['jpg', 'png', 'jpeg'])
     if uploaded_img and st.button("QUÉT OCR"):
         with st.spinner("Đang trích xuất..."):
             reader = load_ocr()
             res = reader.readtext(np.array(Image.open(uploaded_img)), detail=0)
             nums = [n for n in res if n.isdigit() and 2 <= len(n) <= 5]
-            if nums: st.session_state['raw_input'] = ", ".join(nums)
+            if nums: 
+                st.session_state['raw_input'] = ", ".join(nums)
+                st.session_state['gdb_ocr'] = nums[0][-2:]
+                st.session_state['loto_list_display'] = [n[-2:] for n in nums[1:27]]
         st.rerun()
 
-    st.session_state['raw_input'] = st.text_area("Bảng giải:", value=st.session_state['raw_input'], height=150)
-    gdb_confirm = st.text_input("GĐB (2 số cuối):", max_chars=2)
+    st.session_state['raw_input'] = st.text_area("Bảng giải (OCR):", value=st.session_state['raw_input'], height=150)
+    
+    st.subheader("🔍 ĐỐI SOÁT MÁY QUÉT")
+    gdb_confirm = st.text_input("1. Giải Đặc Biệt (2 số cuối):", value=st.session_state['gdb_ocr'], max_chars=2)
+    loto_display = st.text_area("2. Danh sách 26 giải lô (tự cập nhật):", value=", ".join(st.session_state['loto_list_display']), height=100)
 
-    if st.button("🔥 CHẠY TRUY VẾT", type="primary"):
+    if st.button("🔥 CHẠY TRUY VẾT & ĐỐI SOÁT", type="primary"):
         raw = [x.strip() for x in st.session_state['raw_input'].replace(",", " ").split() if x]
         full_str = "".join(raw)
         if len(full_str) >= TOTAL_POS:
-            process_matrix(full_str[:TOTAL_POS], [s[-2:] for s in raw[:27]], gdb_confirm)
+            loto_full = [s[-2:] for s in raw[:27]]
+            process_matrix(full_str[:TOTAL_POS], loto_full, gdb_confirm)
             st.rerun()
         else:
             st.error(f"Dữ liệu mới có {len(full_str)} ký tự, cần đủ {TOTAL_POS}!")
@@ -129,12 +134,11 @@ with col1:
         st.info("Chưa có dàn. Cần ít nhất 2 kỳ nạp.")
 
 with col2:
-    st.subheader("📋 LỊCH SỬ ĐỐI SOÁT")
+    st.subheader("📋 LỊCH SỬ ĐỐI SOÁT NHÁY")
     if st.session_state['db']['history']:
-        # Sắp xếp lịch sử để nhìn mức cao trước
         df_hist = pd.DataFrame(st.session_state['db']['history']).fillna("0")
         st.dataframe(df_hist, use_container_width=True)
     
     st.divider()
     if st.session_state['db']['last_digits']:
-        st.download_button("💾 XUẤT DATA (.JSON)", json.dumps(st.session_state['db']), "matrix_v78.json")
+        st.download_button("💾 XUẤT DATA (.JSON)", json.dumps(st.session_state['db']), "matrix_v79.json")
