@@ -6,7 +6,7 @@ import easyocr
 from PIL import Image
 
 # --- 1. CẤU HÌNH HỆ THỐNG ---
-st.set_page_config(page_title="Matrix V9.3 - Sniper Core 4", layout="wide")
+st.set_page_config(page_title="Matrix V9.3.1 - Sniper Core 4", layout="wide")
 TOTAL_POS = 107 
 
 if 'db' not in st.session_state:
@@ -27,35 +27,24 @@ def load_ocr():
 # --- 2. LOGIC TÍNH TOÁN CORE FOUR ---
 
 def get_power_score_4(new_wire_scores, current_digits):
-    # Thống kê mật độ dây 1đ (để tìm vùng nhiễu)
     mapping_1d = {str(i).zfill(2): 0 for i in range(100)}
     coords_1 = np.argwhere(new_wire_scores == 1)
     for r, c in coords_1:
         num = current_digits[r] + current_digits[c]
         mapping_1d[num] += 1
 
-    # Tính điểm Power Score
     power_map = {str(i).zfill(2): 0 for i in range(100)}
     max_s = int(new_wire_scores.max())
     
-    # Chỉ xét từ mức 2đ trở lên để làm nòng cốt
     for s in range(2, max_s + 1):
         coords = np.argwhere(new_wire_scores == s)
         for r, c in coords:
             num = current_digits[r] + current_digits[c]
-            
-            # Công thức: Điểm = (Cấp điểm ^ 2)
             base_score = s ** 2
-            
-            # Thưởng vùng nhiệt lý tưởng (5-15 dây 1đ)
             heat_bonus = 10 if 5 <= mapping_1d[num] <= 15 else 0
-            
-            # Phạt vùng quá nóng (>30 dây 1đ)
             heat_penalty = -20 if mapping_1d[num] > 30 else 0
-            
             power_map[num] += (base_score + heat_bonus + heat_penalty)
 
-    # Lấy 4 con điểm cao nhất (phải có điểm > 0)
     sorted_power = sorted(power_map.items(), key=lambda x: x[1], reverse=True)
     return [item[0] for item in sorted_power[:4] if item[1] > 0]
 
@@ -71,22 +60,20 @@ def process_matrix(current_digits, current_loto, gdb_val):
     # --- A. ĐỐI SOÁT LỊCH SỬ ---
     hit_report = {"STT": len(db['history']) + 1, "GĐB": gdb_val}
     
-    # Soi Tứ Thủ kỳ trước
     if old_core_4:
         found_4 = [n for n in old_core_4 if n in current_loto]
         count_4 = sum([current_loto.count(n) for n in found_4])
-        hit_report["Dàn 4q"] = f"{count_4} ({','.join(found_4)})" if count_4 > 0 else "0"
+        hit_report["Dàn 4q"] = f"{count_4} ({','.join(found_hits if (found_hits:=found_4) else '0')})"
         hit_report["Win 4q?"] = "✅" if count_4 >= 2 or gdb_val in old_core_4 else "❌"
 
-    # Soi các mức điểm
     if old_preds:
-        for lv, data in old_preds.items():
-            nums = data['nums']
+        fixed_preds = {int(k): v for k, v in old_preds.items()}
+        for lv in sorted(fixed_preds.keys(), reverse=True):
+            nums = fixed_preds[lv]['nums']
             found = [n for n in nums if n in current_loto]
-            count = sum([current_loto.count(n) for n in found])
-            hit_report[f"{lv}đ"] = f"{count}"
+            hit_report[f"{lv}đ"] = f"{sum([current_loto.count(n) for n in found])}"
 
-    # --- B. CẬP NHẬT ĐIỂM (HARD RESET) ---
+    # --- B. CẬP NHẬT ĐIỂM ---
     if len(old_digits) == TOTAL_POS:
         for i in range(TOTAL_POS):
             for j in range(TOTAL_POS):
@@ -94,7 +81,7 @@ def process_matrix(current_digits, current_loto, gdb_val):
                 if num_past in current_loto:
                     new_wire_scores[i][j] = old_scores[i][j] + 1
 
-    # --- C. TẠO DỰ BÁO & ÉP DÀN 4 SỐ ---
+    # --- C. DỰ BÁO ---
     new_preds = {}
     max_s = int(new_wire_scores.max())
     if max_s > 0:
@@ -108,33 +95,28 @@ def process_matrix(current_digits, current_loto, gdb_val):
             isolated = [n for n, count in level_map.items() if count == 1]
             new_preds[int(s)] = {"nums": sorted(isolated), "total_wires": int(len(coords))}
 
-    final_4 = get_power_score_4(new_wire_scores, current_digits)
-
-    # Cập nhật State
     st.session_state['db']['wire_scores'] = new_wire_scores.tolist()
     st.session_state['db']['last_digits'] = current_digits
     st.session_state['db']['last_loto'] = current_loto
     st.session_state['db']['last_predictions'] = new_preds
-    st.session_state['db']['core_four'] = final_4
+    st.session_state['db']['core_four'] = get_power_score_4(new_wire_scores, current_digits)
     st.session_state['db']['history'].insert(0, hit_report)
 
-# --- 3. GIAO DIỆN STREAMLIT ---
-st.markdown("<h1 style='text-align: center; color: #FFCC00;'>🎯 MATRIX V9.3: THE SNIPER CORE 4</h1>", unsafe_allow_html=True)
+# --- 3. GIAO DIỆN ---
+st.markdown("<h1 style='text-align: center; color: #FFCC00;'>🎯 MATRIX V9.3.1: CORE 4 FIX</h1>", unsafe_allow_html=True)
 
 with st.sidebar:
-    st.header("💾 DATA MANAGEMENT")
-    uploaded_file = st.file_uploader("Nạp file JSON", type=['json'])
-    if uploaded_file and st.button("📥 PHỤC HỒI DATA"):
+    st.header("💾 DATA & OCR")
+    uploaded_file = st.file_uploader("Nạp JSON", type=['json'])
+    if uploaded_file and st.button("📥 PHỤC HỒI"):
         st.session_state['db'] = json.load(uploaded_file)
         st.rerun()
     
     if st.session_state['db']['last_digits']:
-        st.download_button("💾 LƯU JSON", json.dumps(st.session_state['db']), "matrix_v93.json")
+        st.download_button("💾 LƯU JSON", json.dumps(st.session_state['db']), "matrix_v931.json")
 
-    st.divider()
-    st.header("📸 INPUT KQ")
-    uploaded_img = st.file_uploader("Quét ảnh KQ", type=['jpg', 'png', 'jpeg'])
-    if uploaded_img and st.button("BẮT ĐẦU QUÉT OCR"):
+    uploaded_img = st.file_uploader("Quét KQ", type=['jpg', 'png', 'jpeg'])
+    if uploaded_img and st.button("QUÉT OCR"):
         reader = load_ocr()
         res = reader.readtext(np.array(Image.open(uploaded_img)), detail=0)
         nums = [n for n in res if n.isdigit() and 2 <= len(n) <= 5]
@@ -143,28 +125,26 @@ with st.sidebar:
             st.session_state['gdb_ocr'] = nums[0][-2:]
         st.rerun()
 
-    st.session_state['raw_input'] = st.text_area("Chuỗi 27 giải:", value=st.session_state.get('raw_input', ""), height=100)
-    gdb_confirm = st.text_input("GĐB (2 số cuối):", value=st.session_state.get('gdb_ocr', ""), max_chars=2)
+    st.session_state['raw_input'] = st.text_area("Chuỗi giải:", value=st.session_state.get('raw_input', ""), height=100)
+    gdb_val = st.text_input("GĐB:", value=st.session_state.get('gdb_ocr', ""), max_chars=2)
 
     if st.button("🔥 CHẠY SNIPER", type="primary"):
         raw = [x.strip() for x in st.session_state['raw_input'].replace(",", " ").split() if x]
         if len("".join(raw)) >= TOTAL_POS:
-            process_matrix("".join(raw)[:TOTAL_POS], [s[-2:] for s in raw[:27]], gdb_confirm)
+            process_matrix("".join(raw)[:TOTAL_POS], [s[-2:] for s in raw[:27]], gdb_val)
             st.rerun()
     st.button("🚨 RESET ALL", on_click=lambda: st.session_state.clear())
 
-# --- 4. KHU VỰC HIỂN THỊ CHÍNH ---
+# --- 4. KHU VỰC HIỂN THỊ ---
 c1, c2 = st.columns([1, 2.5])
 
 with c1:
-    st.markdown("<div style='background-color: #1E1E1E; padding: 20px; border-radius: 10px; border: 2px solid #FFCC00; text-align: center;'>"
-                "<h2 style='color: #FFCC00;'>🚀 TỨ THỦ CORE 4</h2>", unsafe_allow_html=True)
+    st.markdown("<div style='background-color: #1E1E1E; padding: 15px; border-radius: 10px; border: 2px solid #FFCC00; text-align: center;'>", unsafe_allow_html=True)
+    st.subheader("🚀 TỨ THỦ")
     c4 = st.session_state['db'].get('core_four', [])
     if c4:
-        st.markdown(f"<h1 style='color: white; letter-spacing: 5px;'>{' - '.join(c4)}</h1>", unsafe_allow_html=True)
-        st.write("Dàn 4 số có lực hội tụ tọa độ mạnh nhất")
-    else:
-        st.info("Chờ nạp kỳ 2...")
+        st.markdown(f"<h1 style='color: white;'>{' - '.join(c4)}</h1>", unsafe_allow_html=True)
+    else: st.info("Chờ kỳ 2...")
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.divider()
@@ -176,15 +156,13 @@ with c1:
             with st.expander(f"Mức {lv}đ ({len(data['nums'])}q)"):
                 st.code(", ".join(data['nums']))
 
-with col2:
-    st.subheader("📋 BÁO CÁO SNIPER (DÀN 4 QUÂN)")
+with c2: # ĐÃ SỬA LỖI NAMEERROR TẠI ĐÂY
+    st.subheader("📋 BÁO CÁO")
     if st.session_state['db']['history']:
         df_hist = pd.DataFrame(st.session_state['db']['history']).fillna("0")
-        # Sắp xếp cột Win 4q lên cạnh GĐB
         cols = list(df_hist.columns)
+        # Sắp xếp cột quan trọng lên trước
         for c_name in ["Win 4q?", "Dàn 4q"]:
             if c_name in cols:
                 cols.insert(2, cols.pop(cols.index(c_name)))
         st.dataframe(df_hist[cols], use_container_width=True)
-
-st.caption("Chiến thuật: Dàn 4q được coi là Thắng (✅) nếu nổ từ 2 nháy trở lên hoặc trúng đúng GĐB.")
