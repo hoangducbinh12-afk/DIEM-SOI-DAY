@@ -6,7 +6,7 @@ import easyocr
 from PIL import Image
 
 # --- 1. CẤU HÌNH ---
-st.set_page_config(page_title="Matrix V8.3 - Total Erase Engine", layout="wide")
+st.set_page_config(page_title="Matrix V8.4 - Ghost Hunter", layout="wide")
 TOTAL_POS = 107 
 
 if 'db' not in st.session_state:
@@ -25,19 +25,19 @@ if 'loto_list_display' not in st.session_state: st.session_state['loto_list_disp
 def load_ocr():
     return easyocr.Reader(['en'])
 
-# --- 2. LOGIC ĐIỀU HÀNH (FIX LỖI KẸT DỮ LIỆU) ---
+# --- 2. LOGIC ĐIỀU HÀNH (KHẮC PHỤC HIỆN TƯỢNG ĐẺ DÂY) ---
 
 def process_matrix(current_digits, current_loto, gdb_val):
-    # 1. Lấy ma trận cũ và chuyển thành mảng Numpy độc lập
+    # Chuyển ma trận cũ sang Numpy
     old_scores = np.array(st.session_state['db']['wire_scores'], dtype=int)
     old_digits = st.session_state['db']['last_digits']
     old_loto_set = set(st.session_state['db']['last_loto'])
     old_preds = st.session_state['db']['last_predictions']
     
-    # 2. Tạo ma trận MỚI hoàn toàn bằng 0 để hứng kết quả
+    # Khởi tạo ma trận mới TRẮNG TINH
     new_wire_scores = np.zeros((TOTAL_POS, TOTAL_POS), dtype=int)
     
-    # --- BƯỚC A: ĐỐI SOÁT NHÁY (Tính dựa trên dàn dự báo của kỳ TRƯỚC) ---
+    # --- A. ĐỐI SOÁT NHÁY (Dựa trên dự báo cũ) ---
     hit_report = {"STT": len(st.session_state['db']['history']) + 1, "GĐB": gdb_val}
     if old_preds:
         for lv, data in old_preds.items():
@@ -46,20 +46,22 @@ def process_matrix(current_digits, current_loto, gdb_val):
             total_nhay = sum([current_loto.count(n) for n in found_hits])
             hit_report[f"Mức {lv}đ"] = f"{total_nhay} ({','.join(found_hits)})" if total_nhay > 0 else "0"
 
-    # --- BƯỚC B: CẬP NHẬT ĐIỂM (CƠ CHẾ MÁY CHÉM) ---
-    # Chỉ tính toán nếu kỳ trước có đủ dữ liệu. Nếu không đủ, new_wire_scores mặc định bằng 0 (RESET TOÀN BỘ)
+    # --- B. CẬP NHẬT ĐIỂM (LOGIC XÍCH SẮT - SEQUENCE CHAIN) ---
+    # CHỈ CẬP NHẬT NẾU ĐỦ 107 VỊ TRÍ
     if len(old_digits) == TOTAL_POS and len(old_loto_set) > 0:
         for i in range(TOTAL_POS):
             for j in range(TOTAL_POS):
-                # Ánh xạ từ tọa độ (i,j) của kỳ trước
+                # Ánh xạ từ kỳ trước
                 num_past = old_digits[i] + old_digits[j]
                 
-                # Nếu số đó nổ trong bảng kết quả vừa nạp
                 if num_past in old_loto_set:
+                    # Dây nổ: Điểm mới = Điểm cũ + 1
                     new_wire_scores[i][j] = old_scores[i][j] + 1
-                # Nếu không nổ, giá trị tại (i,j) vẫn là 0 (đã khởi tạo ở trên)
+                else:
+                    # Dây KHÔNG nổ: Reset về 0 (Đã mặc định là 0)
+                    new_wire_scores[i][j] = 0
 
-    # --- BƯỚC C: CHIẾT XUẤT DÀN ĐỘC NHẤT CHO KỲ TỚI ---
+    # --- C. CHIẾT XUẤT DÀN ĐỘC NHẤT ---
     new_preds = {}
     max_s = int(new_wire_scores.max())
     if max_s > 0:
@@ -77,16 +79,16 @@ def process_matrix(current_digits, current_loto, gdb_val):
             if isolated or total_wires > 0:
                 new_preds[s] = {"nums": sorted(isolated), "total_wires": total_wires}
 
-    # 3. GHI ĐÈ TUYỆT ĐỐI VÀO SESSION STATE
+    # ĐỒNG BỘ TUYỆT ĐỐI
     st.session_state['db']['wire_scores'] = new_wire_scores.tolist()
     st.session_state['db']['last_digits'] = current_digits
     st.session_state['db']['last_loto'] = current_loto
     st.session_state['db']['last_predictions'] = new_preds
     st.session_state['db']['history'].insert(0, hit_report)
 
-# --- 3. GIAO DIỆN ---
-st.markdown("<h1 style='text-align: center; color: #00FFAA;'>⚡ MATRIX V8.3: TOTAL ERASE</h1>", unsafe_allow_html=True)
-
+# --- GIAO DIỆN GIỮ NGUYÊN NHƯ V8.3 ---
+st.markdown("<h1 style='text-align: center; color: #00FFAA;'>⚡ MATRIX V8.4: GHOST HUNTER</h1>", unsafe_allow_html=True)
+# ... (Phần giao diện Sidebar và Columns y hệt V8.3)
 with st.sidebar:
     st.header("📸 NHẬP LIỆU")
     uploaded_img = st.file_uploader("Quét ảnh bảng KQ", type=['jpg', 'png', 'jpeg'])
@@ -110,14 +112,8 @@ with st.sidebar:
         if len("".join(raw)) >= TOTAL_POS:
             process_matrix("".join(raw)[:TOTAL_POS], [s[-2:] for s in raw[:27]], gdb_confirm)
             st.rerun()
-        else:
-            st.error(f"Thiếu dữ liệu: {len(''.join(raw))}/{TOTAL_POS}")
+    st.button("🚨 RESET", on_click=lambda: st.session_state.clear())
 
-    if st.button("🚨 LÀM MỚI (RESET)"):
-        st.session_state.clear()
-        st.rerun()
-
-# --- 4. HIỂN THỊ ---
 col1, col2 = st.columns([1, 2])
 with col1:
     st.subheader("🎯 DÀN DỰ BÁO")
@@ -127,7 +123,6 @@ with col1:
             data = preds[lv]
             with st.expander(f"⭐ MỨC {lv} ĐIỂM (Dây: {data['total_wires']})", expanded=(lv == max(preds.keys()))):
                 st.code(", ".join(data['nums']) if data['nums'] else "Không có số độc nhất")
-    else: st.info("Đang chờ dữ liệu nhịp thông...")
 
 with col2:
     st.subheader("📋 LỊCH SỬ")
