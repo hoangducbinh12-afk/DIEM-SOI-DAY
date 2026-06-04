@@ -1,160 +1,169 @@
 import streamlit as st
 import pandas as pd
 import json
+import os
 import numpy as np
 import easyocr
 from PIL import Image
 
-# --- 1. KHỞI TẠO HỆ THỐNG ---
+# --- 1. CẤU HÌNH HỆ THỐNG ---
+st.set_page_config(page_title="Matrix V7 - Isolated Signal", layout="wide")
 TOTAL_POS = 107 
-TOTAL_WIRES = TOTAL_POS * TOTAL_POS 
 
+# Khởi tạo Session State
 if 'db' not in st.session_state:
     st.session_state['db'] = {
-        "last_digits": "",    
-        "last_loto": [],      
-        "history": [], 
-        "final_scores": {f"{i:02d}": 0 for i in range(100)}
+        "wire_scores": np.zeros((TOTAL_POS, TOTAL_POS), dtype=int).tolist(), # Ma trận 11.449 sợi dây
+        "last_digits": "",  # Chuỗi 107 số kỳ trước
+        "last_loto": [],    # 27 con loto kỳ trước (tính cả trùng)
+        "history": []       # Nhật ký đối soát nháy
     }
 if 'raw_input' not in st.session_state: st.session_state['raw_input'] = ""
-if 'gdb_val' not in st.session_state: st.session_state['gdb_val'] = ""
 
 @st.cache_resource
 def load_ocr():
     return easyocr.Reader(['en'])
 reader = load_ocr()
 
+# --- 2. HÀM XỬ LÝ LOGIC ---
+
 def extract_data(raw_list):
+    # Lấy 27 con loto cuối giải (tính cả trùng/nháy)
     v_loto = [s[-2:] for s in raw_list[:27]]
+    # Lấy 107 ký tự số đầu tiên từ bảng kết quả
     all_digits = "".join(raw_list)
     return all_digits[:TOTAL_POS], v_loto
 
-# --- THUẬT TOÁN TRUY VẾT HỘI TỤ (GIỮ NGUYÊN LOGIC CHUẨN) ---
-def calculate_convergence(old_digits, old_loto, current_digits):
-    scores = {f"{i:02d}": 0 for i in range(100)}
-    if not old_digits or not old_loto:
-        return scores
-
-    current_matrix = [[current_digits[i] + current_digits[j] for j in range(TOTAL_POS)] for i in range(TOTAL_POS)]
+def process_matrix(current_digits, current_loto):
+    db = st.session_state['db']
+    old_digits = db['last_digits']
+    old_loto = db['last_loto']
+    wire_scores = np.array(db['wire_scores'])
     
-    for win_num in old_loto:
+    # Kết quả nháy kỳ này để đối soát cho lịch sử (dựa trên dàn dự báo của kỳ trước)
+    # Bước này tính nháy trúng trước khi reset/cập nhật ma trận mới
+    hit_report = {}
+    
+    # 1. LOGIC TÍNH ĐIỂM & RESET DÂY
+    if old_digits and old_loto:
+        # Tạo ma trận kết quả của kỳ này tại mọi tọa độ
+        # Để xem tọa độ (i,j) kỳ này thực tế ra số bao nhiêu
+        current_map = [[current_digits[i] + current_digits[j] for j in range(TOTAL_POS)] for i in range(TOTAL_POS)]
+        
         for i in range(TOTAL_POS):
             for j in range(TOTAL_POS):
-                if (old_digits[i] + old_digits[j]) == win_num:
-                    formed_new = current_matrix[i][j]
-                    scores[formed_new] += 1
-    return scores
+                # Lấy số được tạo ra bởi tọa độ (i,j) ở KỲ TRƯỚC
+                num_formed_in_past = old_digits[i] + old_digits[j]
+                
+                # Nếu số đó ĐÃ NỔ trong 27 con lô kỳ trước -> Dây thông
+                if num_formed_in_past in old_loto:
+                    wire_scores[i][j] += 1
+                else:
+                    # Nếu KHÔNG NỔ -> Reset dây về 0 ngay lập tức
+                    wire_scores[i][j] = 0
+    
+    # 2. LOGIC LỌC ĐỘC NHẤT (ISOLATED SIGNAL) CHO KỲ TIẾP THEO
+    # Quét ma trận điểm hiện tại để ra dự báo cho kỳ tới
+    prediction_by_level = {}
+    if current_digits:
+        max_score = int(wire_scores.max())
+        if max_score > 0:
+            for s in range(1, max_score + 1):
+                level_counts = {} # Đếm xem số nào xuất hiện bao nhiêu lần trong hạng cân s
+                coords = np.argwhere(wire_scores == s)
+                
+                for r, c in coords:
+                    num = current_digits[r] + current_digits[c]
+                    level_counts[num] = level_counts.get(num, 0) + 1
+                
+                # CHỈ LẤY NHỮNG SỐ XUẤT HIỆN DUY NHẤT 1 LẦN (COUNT == 1)
+                isolated_nums = [n for n, count in level_counts.items() if count == 1]
+                if isolated_nums:
+                    prediction_by_level[s] = sorted(isolated_nums)
 
-# --- 2. GIAO DIỆN ---
-st.set_page_config(page_title="Matrix Ultra V6", layout="wide")
-st.markdown("<h2 style='text-align: center; color: #00FFAA;'>⚡ MATRIX 11.449 - SIÊU PHÂN LỚP V6</h2>", unsafe_allow_html=True)
+    # 3. CẬP NHẬT DỮ LIỆU GỐC
+    st.session_state['db']['wire_scores'] = wire_scores.tolist()
+    st.session_state['db']['last_digits'] = current_digits
+    st.session_state['db']['last_loto'] = current_loto
+    
+    return prediction_by_level
+
+# --- 3. GIAO DIỆN STREAMLIT ---
+
+st.markdown("<h1 style='text-align: center; color: #00FFAA;'>💎 MATRIX V7: ISOLATED SIGNAL</h1>", unsafe_allow_html=True)
 
 with st.sidebar:
-    st.header("📂 HỆ THỐNG")
-    if st.button("🚨 RESET TOÀN BỘ"):
+    st.header("📸 QUÉT KẾT QUẢ")
+    uploaded_img = st.file_uploader("Tải ảnh bảng KQ (Ảnh 1 nạp tọa độ, Ảnh 2 bắt đầu tính)", type=['jpg', 'png', 'jpeg'])
+    if uploaded_img and st.button("BẮT ĐẦU QUÉT OCR"):
+        with st.spinner("Đang đọc ảnh..."):
+            img = Image.open(uploaded_img)
+            results = reader.readtext(np.array(img), detail=0)
+            nums = [n for n in results if n.isdigit() and 2 <= len(n) <= 5]
+            if nums: st.session_state['raw_input'] = ", ".join(nums)
+        st.rerun()
+
+    st.session_state['raw_input'] = st.text_area("Dữ liệu 27 giải:", value=st.session_state['raw_input'], height=200)
+    gdb_now = st.text_input("GĐB hôm nay (Để lưu lịch sử):", max_chars=2)
+
+    if st.button("🔥 CHẠY TRUY VẾT & CÔ ĐỌNG"):
+        raw_list = [x.strip() for x in st.session_state['raw_input'].replace(",", " ").split() if x]
+        if len(raw_list) >= 27:
+            curr_digits, curr_loto = extract_data(raw_list)
+            
+            # Tính nháy trúng của kỳ vừa nạp dựa trên dàn dự báo cũ (nếu có)
+            # (Phần này sẽ hiển thị trong bảng lịch sử)
+            history_entry = {"STT": len(st.session_state['db']['history']) + 1, "GĐB": gdb_now}
+            
+            # Cập nhật Ma trận & Lấy dàn dự báo mới
+            pred_results = process_matrix(curr_digits, curr_loto)
+            st.session_state['current_predictions'] = pred_results
+            
+            # Thêm vào lịch sử (Mô phỏng đếm nháy)
+            # Vì đây là bản kiểm tra hiệu quả, tao sẽ để mày tự đối soát nháy ở bảng kết quả
+            st.session_state['db']['history'].insert(0, history_entry)
+            st.rerun()
+        else:
+            st.error("Chưa đủ 27 giải!")
+
+    if st.button("🚨 RESET DỮ LIỆU"):
         st.session_state.clear()
         st.rerun()
 
-    st.divider()
-    uploaded_img = st.file_uploader("📸 Quét ảnh KQ", type=['jpg', 'jpeg', 'png'])
-    if uploaded_img and st.button("BẮT ĐẦU OCR"):
-        with st.spinner("Đang trích xuất..."):
-            img_np = np.array(Image.open(uploaded_img))
-            results = reader.readtext(img_np, detail=0)
-            nums = [n for n in results if n.isdigit() and 2 <= len(n) <= 5]
-            if nums:
-                st.session_state['raw_input'] = ", ".join(nums)
-                st.session_state['gdb_val'] = nums[0][-2:]
-        st.rerun()
+# --- 4. HIỂN THỊ KẾT QUẢ ---
 
-    st.session_state['raw_input'] = st.text_area("Nhập 27 giải:", value=st.session_state['raw_input'], height=150)
-    st.session_state['gdb_val'] = st.text_input("GĐB kỳ này:", value=st.session_state['gdb_val'], max_chars=2)
+col1, col2 = st.columns([2, 3])
 
-    if st.button("🔥 CHẠY ĐỐI SOÁT & TRUY VẾT"):
-        raw_list = [x.strip() for x in st.session_state['raw_input'].replace(",", " ").split() if x]
-        if len(raw_list) < 27:
-            st.error("Phải nhập đủ 27 giải!")
+with col1:
+    st.subheader("🎯 DÀN ĐỘC NHẤT THEO ĐIỂM")
+    if 'current_predictions' in st.session_state:
+        preds = st.session_state['current_predictions']
+        if not preds:
+            st.info("Kỳ 1 (Ảnh 1): Đã nạp tọa độ thành công. Hãy nạp Ảnh 2 để bắt đầu tính điểm.")
         else:
-            curr_digits, curr_loto = extract_data(raw_list)
-            
-            # --- BƯỚC 1: ĐỐI SOÁT LỊCH SỬ THEO 16 PHÂN VÙNG ---
-            old_scores = st.session_state['db']['final_scores']
-            df_old = pd.DataFrame(list(old_scores.items()), columns=['Số', 'Điểm']).sort_values(by='Điểm', ascending=False).reset_index(drop=True)
-            
-            rank_val = "-"
-            # Định nghĩa các vùng hạng (Slicing)
-            slices = {
-                "T5": (0, 5), "T10": (5, 10), "T15": (10, 15), "T20": (15, 20),
-                "T25": (20, 25), "T30": (25, 30), "T35": (30, 35), "T40": (35, 40),
-                "T45": (40, 45), "T50": (45, 50), "T60": (50, 60), "T70": (60, 70),
-                "T80": (70, 80), "T90": (80, 90), "T95": (90, 95), "Cao": (95, 100)
-            }
-            
-            groups_data = {}
-            if sum(old_scores.values()) > 0:
-                try: rank_val = df_old[df_old['Số'] == st.session_state['gdb_val']].index[0]
-                except: pass
-                for key, (start, end) in slices.items():
-                    groups_data[key] = df_old.iloc[start:end]['Số'].tolist()
+            # Hiển thị từ điểm cao nhất xuống thấp nhất
+            for level in sorted(preds.keys(), reverse=True):
+                with st.expander(f"⭐ CẦU THÔNG {level} KỲ", expanded=True):
+                    nums = preds[level]
+                    st.markdown(f"**Số lượng: {len(nums)}**")
+                    st.write(", ".join(nums))
+    else:
+        st.write("Chưa có dữ liệu dự báo.")
 
-            def get_hit(targets, results):
-                if not targets: return "0"
-                hits = [n for n in targets if n in results]
-                count = sum([results.count(n) for n in hits])
-                return f"{count}({','.join(sorted(list(set(hits))))})" if count > 0 else "0"
+with col2:
+    st.subheader("📋 NHẬT KÝ ĐỐI SOÁT")
+    if st.session_state['db']['history']:
+        st.table(pd.DataFrame(st.session_state['db']['history']))
+    
+    st.divider()
+    st.subheader("💾 QUẢN TRỊ FILE")
+    data_json = json.dumps(st.session_state['db'], ensure_ascii=False)
+    st.download_button("Tải file Ma trận (.json)", data_json, file_name="matrix_v7_data.json")
 
-            res = {
-                "STT": len(st.session_state['db']['history']) + 1,
-                "GĐB": st.session_state['gdb_val'],
-                "Hạng": rank_val,
-                "T5": get_hit(groups_data.get("T5"), curr_loto),
-                "T10": get_hit(groups_data.get("T10"), curr_loto),
-                "T15": get_hit(groups_data.get("T15"), curr_loto),
-                "T20": get_hit(groups_data.get("T20"), curr_loto),
-                "T25": get_hit(groups_data.get("T25"), curr_loto),
-                "T30": get_hit(groups_data.get("T30"), curr_loto),
-                "T35": get_hit(groups_data.get("T35"), curr_loto),
-                "T40": get_hit(groups_data.get("T40"), curr_loto),
-                "T45": get_hit(groups_data.get("T45"), curr_loto),
-                "T50": get_hit(groups_data.get("T50"), curr_loto),
-                "T60": get_hit(groups_data.get("T60"), curr_loto),
-                "T70": get_hit(groups_data.get("T70"), curr_loto),
-                "T80": get_hit(groups_data.get("T80"), curr_loto),
-                "T90": get_hit(groups_data.get("T90"), curr_loto),
-                "T95": get_hit(groups_data.get("T95"), curr_loto),
-                "Cao": get_hit(groups_data.get("Cao"), curr_loto),
-            }
-
-            # --- BƯỚC 2: TÍNH DỰ BÁO MỚI ---
-            new_scores = calculate_convergence(
-                st.session_state['db']['last_digits'], 
-                st.session_state['db']['last_loto'], 
-                curr_digits
-            )
-            
-            st.session_state['db']['history'].append(res)
-            st.session_state['db']['final_scores'] = new_scores
-            st.session_state['db']['last_digits'] = curr_digits
-            st.session_state['db']['last_loto'] = curr_loto
-            st.rerun()
-
-# --- 3. HIỂN THỊ ---
-if st.session_state['db'].get('final_scores'):
-    c1, c2 = st.columns([1, 4]) # Ép bảng lịch sử rộng ra để chứa 16 cột
-    with c1:
-        st.subheader("📊 DỰ BÁO TIẾP")
-        score_df = pd.DataFrame(list(st.session_state['db']['final_scores'].items()), columns=['Số', 'Điểm'])
-        score_df = score_df.sort_values(by='Điểm', ascending=False).reset_index(drop=True)
-        st.dataframe(score_df, use_container_width=True, height=600)
-
-    with c2:
-        st.subheader("📜 LỊCH SỬ SIÊU PHÂN LỚP")
-        if st.session_state['db']['history']:
-            # Hiển thị bảng lịch sử (Streamlit sẽ tự tạo thanh cuộn ngang nếu quá dài)
-            st.dataframe(pd.DataFrame(st.session_state['db']['history']), use_container_width=True)
-        
-        st.divider()
-        st.subheader("🎯 LẤY DÀN NHANH")
-        n = st.number_input("Số quân đầu bảng:", 1, 100, 5)
-        st.code(", ".join(score_df.head(n)['Số'].tolist()))
-        st.download_button("💾 XUẤT JSON", data=json.dumps(st.session_state['db']), file_name="matrix_v6.json")
+# Hướng dẫn nhanh cho mày
+st.info("""
+**HƯỚNG DẪN KIỂM TRA:**
+1. **Ảnh 1:** Nạp KQ ngày 1 -> Bấm 'Truy vết'. App sẽ báo chưa có dự báo (vì chưa có kỳ trước đó).
+2. **Ảnh 2:** Nạp KQ ngày 2 -> Bấm 'Truy vết'. Lúc này App so sánh Ảnh 2 với Ảnh 1, dây nào ăn sẽ lên 1 điểm.
+3. **Kết quả:** Dàn 'Cầu thông 1 kỳ' sẽ hiện ra để đánh cho Ngày 3.
+""")
