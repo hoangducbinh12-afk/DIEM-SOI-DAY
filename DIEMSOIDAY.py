@@ -6,7 +6,7 @@ import easyocr
 from PIL import Image
 
 # --- 1. CẤU HÌNH ---
-st.set_page_config(page_title="Matrix V8.2 - Ultimate Verification", layout="wide")
+st.set_page_config(page_title="Matrix V8.3 - Total Erase Engine", layout="wide")
 TOTAL_POS = 107 
 
 if 'db' not in st.session_state:
@@ -25,76 +25,73 @@ if 'loto_list_display' not in st.session_state: st.session_state['loto_list_disp
 def load_ocr():
     return easyocr.Reader(['en'])
 
-# --- 2. LOGIC ĐIỀU HÀNH (HARD RESET + FULL VERIFICATION) ---
+# --- 2. LOGIC ĐIỀU HÀNH (FIX LỖI KẸT DỮ LIỆU) ---
 
 def process_matrix(current_digits, current_loto, gdb_val):
-    # Lấy dữ liệu từ session
-    wire_scores = np.array(st.session_state['db']['wire_scores'])
+    # 1. Lấy ma trận cũ và chuyển thành mảng Numpy độc lập
+    old_scores = np.array(st.session_state['db']['wire_scores'], dtype=int)
     old_digits = st.session_state['db']['last_digits']
     old_loto_set = set(st.session_state['db']['last_loto'])
     old_preds = st.session_state['db']['last_predictions']
     
-    # --- A. ĐỐI SOÁT NHÁY (Dàn cũ vs KQ mới nạp) ---
+    # 2. Tạo ma trận MỚI hoàn toàn bằng 0 để hứng kết quả
+    new_wire_scores = np.zeros((TOTAL_POS, TOTAL_POS), dtype=int)
+    
+    # --- BƯỚC A: ĐỐI SOÁT NHÁY (Tính dựa trên dàn dự báo của kỳ TRƯỚC) ---
     hit_report = {"STT": len(st.session_state['db']['history']) + 1, "GĐB": gdb_val}
     if old_preds:
         for lv, data in old_preds.items():
             pred_nums = data['nums']
-            found_hits = []
-            for n in pred_nums:
-                count = current_loto.count(n)
-                if count > 0:
-                    found_hits.extend([n] * count)
-            
-            total_nhay = len(found_hits)
+            found_hits = [n for n in pred_nums if n in current_loto]
+            total_nhay = sum([current_loto.count(n) for n in found_hits])
             hit_report[f"Mức {lv}đ"] = f"{total_nhay} ({','.join(found_hits)})" if total_nhay > 0 else "0"
 
-    # --- B. CẬP NHẬT MA TRẬN (HARD RESET) ---
-    new_wire_scores = np.zeros((TOTAL_POS, TOTAL_POS), dtype=int)
-    if len(old_digits) >= TOTAL_POS and old_loto_set:
+    # --- BƯỚC B: CẬP NHẬT ĐIỂM (CƠ CHẾ MÁY CHÉM) ---
+    # Chỉ tính toán nếu kỳ trước có đủ dữ liệu. Nếu không đủ, new_wire_scores mặc định bằng 0 (RESET TOÀN BỘ)
+    if len(old_digits) == TOTAL_POS and len(old_loto_set) > 0:
         for i in range(TOTAL_POS):
             for j in range(TOTAL_POS):
-                # Kiểm tra ánh xạ kỳ trước
+                # Ánh xạ từ tọa độ (i,j) của kỳ trước
                 num_past = old_digits[i] + old_digits[j]
+                
+                # Nếu số đó nổ trong bảng kết quả vừa nạp
                 if num_past in old_loto_set:
-                    # Nếu nổ: Lấy điểm cũ + 1
-                    new_wire_scores[i][j] = wire_scores[i][j] + 1
-                # Không nổ mặc định là 0
-    wire_scores = new_wire_scores
+                    new_wire_scores[i][j] = old_scores[i][j] + 1
+                # Nếu không nổ, giá trị tại (i,j) vẫn là 0 (đã khởi tạo ở trên)
 
-    # --- C. CHIẾT XUẤT DÀN ĐỘC NHẤT ---
+    # --- BƯỚC C: CHIẾT XUẤT DÀN ĐỘC NHẤT CHO KỲ TỚI ---
     new_preds = {}
-    max_s = int(wire_scores.max())
+    max_s = int(new_wire_scores.max())
     if max_s > 0:
         for s in range(1, max_s + 1):
-            coords = np.argwhere(wire_scores == s)
-            total_wires_at_s = len(coords)
-            if total_wires_at_s == 0: continue
+            coords = np.argwhere(new_wire_scores == s)
+            total_wires = len(coords)
+            if total_wires == 0: continue
             
             level_map = {}
             for r, c in coords:
                 num = current_digits[r] + current_digits[c]
                 level_map[num] = level_map.get(num, 0) + 1
             
-            # Lọc độc nhất nội bộ mức điểm
             isolated = [n for n, count in level_map.items() if count == 1]
-            if isolated or total_wires_at_s > 0:
-                new_preds[s] = {"nums": sorted(isolated), "total_wires": total_wires_at_s}
+            if isolated or total_wires > 0:
+                new_preds[s] = {"nums": sorted(isolated), "total_wires": total_wires}
 
-    # ĐỒNG BỘ SESSION
-    st.session_state['db']['wire_scores'] = wire_scores.tolist()
+    # 3. GHI ĐÈ TUYỆT ĐỐI VÀO SESSION STATE
+    st.session_state['db']['wire_scores'] = new_wire_scores.tolist()
     st.session_state['db']['last_digits'] = current_digits
     st.session_state['db']['last_loto'] = current_loto
     st.session_state['db']['last_predictions'] = new_preds
     st.session_state['db']['history'].insert(0, hit_report)
 
 # --- 3. GIAO DIỆN ---
-st.markdown("<h1 style='text-align: center; color: #00FFAA;'>⚡ MATRIX V8.2: ULTIMATE VERIFICATION</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #00FFAA;'>⚡ MATRIX V8.3: TOTAL ERASE</h1>", unsafe_allow_html=True)
 
 with st.sidebar:
-    st.header("📸 NHẬP LIỆU & OCR")
+    st.header("📸 NHẬP LIỆU")
     uploaded_img = st.file_uploader("Quét ảnh bảng KQ", type=['jpg', 'png', 'jpeg'])
     if uploaded_img and st.button("BẮT ĐẦU QUÉT"):
-        with st.spinner("Đang trích xuất..."):
+        with st.spinner("OCR..."):
             reader = load_ocr()
             res = reader.readtext(np.array(Image.open(uploaded_img)), detail=0)
             nums = [n for n in res if n.isdigit() and 2 <= len(n) <= 5]
@@ -104,45 +101,35 @@ with st.sidebar:
                 st.session_state['loto_list_display'] = [n[-2:] for n in nums[1:27]]
         st.rerun()
 
-    st.session_state['raw_input'] = st.text_area("Dữ liệu thô (OCR):", value=st.session_state['raw_input'], height=150)
-    
-    st.subheader("🔍 ĐỐI SOÁT QUÉT")
-    gdb_confirm = st.text_input("1. Giải Đặc Biệt (2 số cuối):", value=st.session_state['gdb_ocr'], max_chars=2)
-    loto_display = st.text_area("2. Danh sách 26 giải lô:", value=", ".join(st.session_state['loto_list_display']), height=100)
+    st.session_state['raw_input'] = st.text_area("Dữ liệu thô:", value=st.session_state['raw_input'], height=150)
+    gdb_confirm = st.text_input("GĐB (2 số cuối):", value=st.session_state['gdb_ocr'], max_chars=2)
+    loto_display = st.text_area("26 giải lô:", value=", ".join(st.session_state['loto_list_display']), height=100)
 
     if st.button("🔥 CHẠY PHÂN TÍCH", type="primary"):
         raw = [x.strip() for x in st.session_state['raw_input'].replace(",", " ").split() if x]
-        full_str = "".join(raw)
-        if len(full_str) >= TOTAL_POS:
-            process_matrix(full_str[:TOTAL_POS], [s[-2:] for s in raw[:27]], gdb_confirm)
+        if len("".join(raw)) >= TOTAL_POS:
+            process_matrix("".join(raw)[:TOTAL_POS], [s[-2:] for s in raw[:27]], gdb_confirm)
             st.rerun()
         else:
-            st.error(f"Dữ liệu thiếu: mới có {len(full_str)} ký tự, cần đủ {TOTAL_POS}!")
+            st.error(f"Thiếu dữ liệu: {len(''.join(raw))}/{TOTAL_POS}")
 
-    if st.button("🚨 LÀM MỚI TOÀN BỘ"):
+    if st.button("🚨 LÀM MỚI (RESET)"):
         st.session_state.clear()
         st.rerun()
 
 # --- 4. HIỂN THỊ ---
 col1, col2 = st.columns([1, 2])
 with col1:
-    st.subheader("🎯 DÀN ĐỘC NHẤT")
+    st.subheader("🎯 DÀN DỰ BÁO")
     preds = st.session_state['db'].get('last_predictions', {})
     if preds:
         for lv in sorted(preds.keys(), reverse=True):
             data = preds[lv]
             with st.expander(f"⭐ MỨC {lv} ĐIỂM (Dây: {data['total_wires']})", expanded=(lv == max(preds.keys()))):
-                st.write(f"Số quân độc nhất: **{len(data['nums'])}**")
                 st.code(", ".join(data['nums']) if data['nums'] else "Không có số độc nhất")
-    else:
-        st.info("Chưa có dàn. Cần nạp ít nhất 2 kỳ.")
+    else: st.info("Đang chờ dữ liệu nhịp thông...")
 
 with col2:
-    st.subheader("📋 BÁO CÁO LỊCH SỬ")
+    st.subheader("📋 LỊCH SỬ")
     if st.session_state['db']['history']:
-        df_hist = pd.DataFrame(st.session_state['db']['history']).fillna("0")
-        st.dataframe(df_hist, use_container_width=True)
-    
-    st.divider()
-    if st.session_state['db']['last_digits']:
-        st.download_button("💾 XUẤT JSON", json.dumps(st.session_state['db']), "matrix_v82.json")
+        st.dataframe(pd.DataFrame(st.session_state['db']['history']).fillna("0"))
