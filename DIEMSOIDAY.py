@@ -5,21 +5,9 @@ import numpy as np
 import easyocr
 from PIL import Image
 
-# --- 1. CẤU HÌNH HỆ THỐNG ---
-st.set_page_config(page_title="MATRIX V9.3.7 - GOLDEN ULTIMATE", layout="wide")
+# --- 1. CẤU HÌNH ---
+st.set_page_config(page_title="Matrix V9.3.3 - Sniper Core 4", layout="wide")
 TOTAL_POS = 107 
-
-# Custom CSS: Giữ nguyên 100% phong cách V9.3.3
-st.markdown("""
-    <style>
-    .main { background-color: #0E1117; }
-    .stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #262730; color: white; border: 1px solid #444; }
-    .stButton>button:hover { border-color: #FFD700; color: #FFD700; }
-    .report-card { background-color: #FFD700; padding: 20px; border-radius: 15px; text-align: center; border: 3px solid #000000; box-shadow: 0px 4px 15px rgba(0,0,0,0.5); }
-    .metric-text { color: #000000; font-size: 50px; font-weight: 900; letter-spacing: 5px; margin: 0; }
-    .section-header { color: #FFD700; border-bottom: 2px solid #FFD700; padding-bottom: 5px; margin-bottom: 15px; font-weight: bold; }
-    </style>
-    """, unsafe_allow_html=True)
 
 if 'db' not in st.session_state:
     st.session_state['db'] = {
@@ -36,7 +24,7 @@ if 'raw_input' not in st.session_state: st.session_state['raw_input'] = ""
 def load_ocr():
     return easyocr.Reader(['en'])
 
-# --- 2. LOGIC SNIPER (THUẬT TOÁN GỐC) ---
+# --- 2. LOGIC SNIPER (GIỮ NGUYÊN THUẬT TOÁN MÀY GỬI) ---
 
 def get_power_score_4(new_wire_scores, current_digits):
     mapping_1d = {str(i).zfill(2): 0 for i in range(100)}
@@ -81,14 +69,14 @@ def process_matrix(current_digits, current_loto, gdb_val):
     
     new_wire_scores = np.zeros((TOTAL_POS, TOTAL_POS), dtype=int)
     
-    # --- A. ĐỐI SOÁT KẾT QUẢ ---
+    # --- A. ĐỐI SOÁT LỊCH SỬ (CẬP NHẬT KÝ HIỆU THEO TIÊU CHUẨN MỚI) ---
     hit_report = {"STT": len(db['history']) + 1, "GĐB": gdb_val}
     if old_core_4:
         found_4 = [n for n in old_core_4 if n in current_loto]
         count_4 = sum([current_loto.count(n) for n in found_4])
         hit_report["Dàn 4q"] = f"{count_4} ({','.join(found_4) if found_4 else '0'})"
         
-        # ÁP DỤNG KÝ HIỆU THEO YÊU CẦU
+        # Tiêu chuẩn ký hiệu mới
         if count_4 >= 2 or gdb_val in old_core_4:
             hit_report["Kết quả"] = "THẮNG 🔥"
         elif count_4 == 1:
@@ -111,7 +99,6 @@ def process_matrix(current_digits, current_loto, gdb_val):
                 if num_past in current_loto:
                     new_wire_scores[i][j] = old_scores[i][j] + 1
 
-    # --- C. DỰ BÁO ---
     new_preds = {}
     max_s = int(new_wire_scores.max())
     if max_s > 0:
@@ -133,20 +120,20 @@ def process_matrix(current_digits, current_loto, gdb_val):
     st.session_state['db']['history'].insert(0, hit_report)
 
 # --- 3. GIAO DIỆN ---
-st.markdown("<h1 style='text-align: center; color: #FFD700;'>⚡ MATRIX SNIPER V9.3.7</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #FFD700;'>⚡ MATRIX V9.3.3: SNIPER ULTIMATE</h1>", unsafe_allow_html=True)
 
 with st.sidebar:
     st.header("💾 DỮ LIỆU")
     uploaded_file = st.file_uploader("Nạp JSON", type=['json'])
-    if uploaded_file and st.button(" Phục hồi"):
+    if uploaded_file and st.button("📥 PHỤC HỒI"):
         st.session_state['db'] = json.load(uploaded_file)
         st.rerun()
     if st.session_state['db']['last_digits']:
-        st.download_button(" Lưu JSON", json.dumps(st.session_state['db']), "matrix_v937.json")
+        st.download_button("💾 LƯU JSON", json.dumps(st.session_state['db']), "matrix_v933.json")
     
     st.divider()
-    st.header("📸 QUÉT ẢNH")
-    uploaded_img = st.file_uploader("Chọn ảnh", type=['jpg', 'png', 'jpeg'])
+    st.header("📸 NHẬP KQ")
+    uploaded_img = st.file_uploader("Quét ảnh", type=['jpg', 'png', 'jpeg'])
     if uploaded_img and st.button("QUÉT OCR"):
         reader = load_ocr()
         res = reader.readtext(np.array(Image.open(uploaded_img)), detail=0)
@@ -164,25 +151,26 @@ with st.sidebar:
         if len("".join(raw)) >= TOTAL_POS:
             process_matrix("".join(raw)[:TOTAL_POS], [s[-2:] for s in raw[:27]], gdb_val)
             st.rerun()
-    st.button(" RESET ALL", on_click=lambda: st.session_state.clear())
+    st.button("🚨 RESET ALL", on_click=lambda: st.session_state.clear())
 
-# --- 4. HIỂN THỊ ---
+# --- 4. HIỂN THỊ (SỬA MÀU CHỮ) ---
 c1, c2 = st.columns([1, 2.5])
 
 with c1:
     st.markdown("""
-        <div class="report-card">
+        <div style="background-color: #FFD700; padding: 20px; border-radius: 15px; text-align: center; border: 3px solid #000000;">
             <h3 style="color: #000000; margin-bottom: 5px;">🎯 TỨ THỦ CORE 4</h3>
     """, unsafe_allow_html=True)
+    
     c4 = st.session_state['db'].get('core_four', [])
     if c4:
-        st.markdown(f"<p class='metric-text'>{' - '.join(c4)}</p>", unsafe_allow_html=True)
+        st.markdown(f"<h1 style='color: #000000; font-size: 45px; font-weight: bold; margin-top: 0;'>{' - '.join(c4)}</h1>", unsafe_allow_html=True)
     else:
         st.write("Đang tính toán...")
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.divider()
-    st.markdown("<h2 class='section-header'>📊 CHI TIẾT DÂY</h2>", unsafe_allow_html=True)
+    st.subheader("📊 CHI TIẾT DÂY")
     preds = st.session_state['db'].get('last_predictions', {})
     if preds:
         sorted_keys = sorted([int(k) for k in preds.keys()], reverse=True)
@@ -192,15 +180,18 @@ with c1:
                 st.code(", ".join(data['nums']))
 
 with c2:
-    st.markdown("<h2 class='section-header'>📋 LỊCH SỬ KẾT QUẢ</h2>", unsafe_allow_html=True)
+    st.subheader("📋 BÁO CÁO LỊCH SỬ")
     if st.session_state['db']['history']:
         df_hist = pd.DataFrame(st.session_state['db']['history']).fillna("0")
+        
+        # Sắp xếp các cột: STT -> GĐB -> Kết quả -> Dàn 4q -> Các mức điểm
         cols = list(df_hist.columns)
         important = ["Kết quả", "Dàn 4q", "GĐB", "STT"]
         for col in reversed(important):
-            if col in cols: cols.insert(0, cols.pop(cols.index(col)))
+            if col in cols:
+                cols.insert(0, cols.pop(cols.index(col)))
         
-        # HIỂN THỊ VỚI MÀU SẮC ĐỐI SOÁT
+        # Hiển thị và tô màu ký hiệu
         if "Kết quả" in df_hist.columns:
             st.dataframe(
                 df_hist[cols].style.map(
