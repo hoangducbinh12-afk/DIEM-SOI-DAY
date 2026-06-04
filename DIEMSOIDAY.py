@@ -6,18 +6,19 @@ import easyocr
 from PIL import Image
 
 # --- 1. CẤU HÌNH HỆ THỐNG ---
-st.set_page_config(page_title="MATRIX V9.3.3 - ULTIMATE PRO", layout="wide")
+st.set_page_config(page_title="MATRIX V9.3.4 - DEEP BLUE PRO", layout="wide")
 TOTAL_POS = 107 
 
-# Custom CSS cho giao diện chuyên nghiệp
+# Custom CSS cho giao diện Xanh Đen dịu mắt
 st.markdown("""
     <style>
-    .main { background-color: #0E1117; }
-    .stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #262730; color: white; border: 1px solid #444; }
-    .stButton>button:hover { border-color: #00FFBB; color: #00FFBB; }
-    .report-card { background-color: #FFD700; padding: 25px; border-radius: 15px; text-align: center; border: 4px solid #000; box-shadow: 0px 4px 15px rgba(0,0,0,0.5); }
-    .metric-text { color: #000; font-size: 50px; font-weight: 900; letter-spacing: 5px; margin: 0; }
-    .section-header { color: #00FFBB; border-bottom: 2px solid #00FFBB; padding-bottom: 5px; margin-bottom: 15px; font-weight: bold; }
+    .main { background-color: #050A18; }
+    .stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #1B263B; color: #E0E1DD; border: 1px solid #415A77; }
+    .stButton>button:hover { border-color: #778DA9; color: white; }
+    .report-card { background-color: #FFD700; padding: 25px; border-radius: 15px; text-align: center; border: 4px solid #0D1B2A; box-shadow: 0px 4px 15px rgba(0,0,0,0.3); }
+    .metric-text { color: #0D1B2A; font-size: 50px; font-weight: 900; letter-spacing: 5px; margin: 0; }
+    .section-header { color: #8ECAE6; border-bottom: 2px solid #219EBC; padding-bottom: 5px; margin-bottom: 15px; font-weight: bold; }
+    .stExpander { border: 1px solid #1B263B; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -36,7 +37,7 @@ if 'raw_input' not in st.session_state: st.session_state['raw_input'] = ""
 def load_ocr():
     return easyocr.Reader(['en'])
 
-# --- 2. LOGIC SNIPER (GIỮ NGUYÊN THUẬT TOÁN GỐC) ---
+# --- 2. LOGIC SNIPER ---
 
 def get_power_score_4(new_wire_scores, current_digits):
     mapping_1d = {str(i).zfill(2): 0 for i in range(100)}
@@ -81,14 +82,13 @@ def process_matrix(current_digits, current_loto, gdb_val):
     
     new_wire_scores = np.zeros((TOTAL_POS, TOTAL_POS), dtype=int)
     
-    # --- A. ĐỐI SOÁT LỊCH SỬ VỚI KÝ HIỆU MỚI ---
+    # --- A. ĐỐI SOÁT LỊCH SỬ ---
     hit_report = {"STT": len(db['history']) + 1, "GĐB": gdb_val}
     if old_core_4:
         found_4 = [n for n in old_core_4 if n in current_loto]
         count_4 = sum([current_loto.count(n) for n in found_4])
         hit_report["Dàn 4q"] = f"{count_4} ({','.join(found_4) if found_4 else '0'})"
         
-        # ÁP DỤNG TIÊU CHUẨN KÝ HIỆU MỚI
         if count_4 >= 2 or gdb_val in old_core_4:
             hit_report["Kết quả"] = "THẮNG 🔥"
         elif count_4 == 1:
@@ -103,7 +103,6 @@ def process_matrix(current_digits, current_loto, gdb_val):
             found = [n for n in nums if n in current_loto]
             hit_report[f"{lv}đ"] = f"{sum([current_loto.count(n) for n in found])}"
 
-    # --- B. CẬP NHẬT ĐIỂM ---
     if len(old_digits) == TOTAL_POS:
         for i in range(TOTAL_POS):
             for j in range(TOTAL_POS):
@@ -111,7 +110,6 @@ def process_matrix(current_digits, current_loto, gdb_val):
                 if num_past in current_loto:
                     new_wire_scores[i][j] = old_scores[i][j] + 1
 
-    # --- C. DỰ BÁO ---
     new_preds = {}
     max_s = int(new_wire_scores.max())
     if max_s > 0:
@@ -133,7 +131,7 @@ def process_matrix(current_digits, current_loto, gdb_val):
     st.session_state['db']['history'].insert(0, hit_report)
 
 # --- 3. GIAO DIỆN ---
-st.markdown("<h1 style='text-align: center; color: #00FFBB;'>⚡ MATRIX PRO V9.3.3</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #8ECAE6; font-weight: bold;'>⚡ MATRIX PRO V9.3.4</h1>", unsafe_allow_html=True)
 
 with st.sidebar:
     st.markdown("<h2 class='section-header'>💾 DỮ LIỆU</h2>", unsafe_allow_html=True)
@@ -145,9 +143,9 @@ with st.sidebar:
         st.download_button("💾 LƯU JSON", json.dumps(st.session_state['db']), "matrix_pro.json")
     
     st.divider()
-    st.markdown("<h2 class='section-header'>📸 QUÉT ẢNH</h2>", unsafe_allow_html=True)
-    uploaded_img = st.file_uploader("Chọn ảnh kết quả", type=['jpg', 'png', 'jpeg'])
-    if uploaded_img and st.button("🔍 QUÉT OCR"):
+    st.markdown("<h2 class='section-header'>📸 OCR</h2>", unsafe_allow_html=True)
+    uploaded_img = st.file_uploader("Quét ảnh", type=['jpg', 'png', 'jpeg'])
+    if uploaded_img and st.button("🔍 QUÉT"):
         reader = load_ocr()
         res = reader.readtext(np.array(Image.open(uploaded_img)), detail=0)
         nums = [n for n in res if n.isdigit() and 2 <= len(n) <= 5]
@@ -156,17 +154,15 @@ with st.sidebar:
             st.session_state['gdb_ocr'] = nums[0][-2:]
         st.rerun()
 
-    st.markdown("<h2 class='section-header'>⚙️ NHẬP LIỆU</h2>", unsafe_allow_html=True)
     st.session_state['raw_input'] = st.text_area("Chuỗi số giải:", value=st.session_state.get('raw_input', ""), height=100)
-    gdb_confirm = st.text_input("GĐB (2 số cuối):", value=st.session_state.get('gdb_ocr', ""), max_chars=2)
+    gdb_confirm = st.text_input("GĐB (2 số):", value=st.session_state.get('gdb_ocr', ""), max_chars=2)
 
-    if st.button("🔥 KÍCH HOẠT SNIPER", type="primary"):
+    if st.button("🔥 CHẠY SNIPER", type="primary"):
         raw = [x.strip() for x in st.session_state['raw_input'].replace(",", " ").split() if x]
         if len("".join(raw)) >= TOTAL_POS:
             process_matrix("".join(raw)[:TOTAL_POS], [s[-2:] for s in raw[:27]], gdb_confirm)
             st.rerun()
-    
-    st.button("🚨 LÀM MỚI (RESET)", on_click=lambda: st.session_state.clear())
+    st.button("🚨 RESET ALL", on_click=lambda: st.session_state.clear())
 
 # --- 4. HIỂN THỊ ---
 c1, c2 = st.columns([1, 2.5])
@@ -177,38 +173,34 @@ with c1:
     if c4:
         st.markdown(f"""
             <div class="report-card">
-                <p style="color: #000; font-weight: bold; margin-bottom: 5px;">TARGET NUMBERS</p>
+                <p style="color: #0D1B2A; font-weight: bold; margin-bottom: 5px;">TARGET NUMBERS</p>
                 <p class="metric-text">{' - '.join(c4)}</p>
             </div>
             """, unsafe_allow_html=True)
-    else:
-        st.info("Cần nạp kỳ 1 lấy gốc, kỳ 2 bắt đầu soi.")
+    else: st.info("Nạp kỳ 1 lấy gốc, kỳ 2 có điểm.")
 
     st.divider()
     st.markdown("<h2 class='section-header'>📊 CHI TIẾT DÂY</h2>", unsafe_allow_html=True)
     preds = st.session_state['db'].get('last_predictions', {})
     if preds:
-        sorted_keys = sorted([int(k) for k in preds.keys()], reverse=True)
-        for lv in sorted_keys:
+        for lv in sorted([int(k) for k in preds.keys()], reverse=True):
             data = preds[str(lv)] if str(lv) in preds else preds[lv]
             with st.expander(f"Mức {lv}đ ({len(data['nums'])} quân)"):
                 st.code(", ".join(data['nums']))
 
 with c2:
-    st.markdown("<h2 class='section-header'>📋 NHẬT KÝ ĐỐI SOÁT</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 class='section-header'>📋 LỊCH SỬ ĐỐI SOÁT</h2>", unsafe_allow_html=True)
     if st.session_state['db']['history']:
         df_hist = pd.DataFrame(st.session_state['db']['history']).fillna("0")
-        
-        # Sắp xếp các cột quan trọng lên trước
         cols = list(df_hist.columns)
         important = ["Kết quả", "Dàn 4q", "GĐB", "STT"]
         for col in reversed(important):
-            if col in cols:
-                cols.insert(0, cols.pop(cols.index(col)))
+            if col in cols: cols.insert(0, cols.pop(cols.index(col)))
         
+        # Sửa lỗi AttributeError bằng cách dùng .map() thay vì .applymap()
         st.dataframe(
-            df_hist[cols].style.applymap(
-                lambda x: 'color: #00FFBB; font-weight: bold' if x == "THẮNG 🔥" else 
+            df_hist[cols].style.map(
+                lambda x: 'color: #8ECAE6; font-weight: bold' if x == "THẮNG 🔥" else 
                           ('color: #FFD700' if x == "✅" else ('color: #FF4B4B' if x == "❌" else '')),
                 subset=["Kết quả"]
             ),
