@@ -6,19 +6,18 @@ import easyocr
 from PIL import Image
 
 # --- 1. CẤU HÌNH HỆ THỐNG ---
-st.set_page_config(page_title="MATRIX V9.3.5 - DEEP BLUE PRO", layout="wide")
+st.set_page_config(page_title="MATRIX V9.3.6 - GOLDEN SNIPER", layout="wide")
 TOTAL_POS = 107 
 
-# Custom CSS cho giao diện Xanh Navy - Đen trầm, dịu mắt
+# Custom CSS: Quay lại tông màu Vàng - Đen rực rỡ của V9.3.3
 st.markdown("""
     <style>
-    .main { background-color: #0B0E14; }
-    .stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #1A212E; color: #BDC3C7; border: 1px solid #2C3E50; }
-    .stButton>button:hover { border-color: #3498DB; color: white; }
-    .report-card { background-color: #F1C40F; padding: 25px; border-radius: 15px; text-align: center; border: 4px solid #2C3E50; }
-    .metric-text { color: #2C3E50; font-size: 50px; font-weight: 900; letter-spacing: 5px; margin: 0; }
-    .section-header { color: #5DADE2; border-bottom: 2px solid #2E86C1; padding-bottom: 5px; margin-bottom: 15px; font-weight: bold; }
-    .stExpander { border: 1px solid #1A212E; background-color: #0B0E14; }
+    .main { background-color: #0E1117; }
+    .stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #262730; color: white; border: 1px solid #444; }
+    .stButton>button:hover { border-color: #FFD700; color: #FFD700; }
+    .report-card { background-color: #FFD700; padding: 25px; border-radius: 15px; text-align: center; border: 4px solid #000; box-shadow: 0px 4px 15px rgba(0,0,0,0.5); }
+    .metric-text { color: #000; font-size: 50px; font-weight: 900; letter-spacing: 5px; margin: 0; }
+    .section-header { color: #FFD700; border-bottom: 2px solid #FFD700; padding-bottom: 5px; margin-bottom: 15px; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -37,7 +36,7 @@ if 'raw_input' not in st.session_state: st.session_state['raw_input'] = ""
 def load_ocr():
     return easyocr.Reader(['en'])
 
-# --- 2. LOGIC SNIPER ---
+# --- 2. LOGIC SNIPER (GIỮ NGUYÊN BẢN 9.3.3) ---
 
 def get_power_score_4(new_wire_scores, current_digits):
     mapping_1d = {str(i).zfill(2): 0 for i in range(100)}
@@ -82,6 +81,7 @@ def process_matrix(current_digits, current_loto, gdb_val):
     
     new_wire_scores = np.zeros((TOTAL_POS, TOTAL_POS), dtype=int)
     
+    # --- A. ĐỐI SOÁT LỊCH SỬ (KÝ HIỆU CHUẨN) ---
     hit_report = {"STT": len(db['history']) + 1, "GĐB": gdb_val}
     if old_core_4:
         found_4 = [n for n in old_core_4 if n in current_loto]
@@ -130,7 +130,7 @@ def process_matrix(current_digits, current_loto, gdb_val):
     st.session_state['db']['history'].insert(0, hit_report)
 
 # --- 3. GIAO DIỆN ---
-st.markdown("<h1 style='text-align: center; color: #5DADE2; font-weight: bold;'>⚡ MATRIX PRO V9.3.5</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #FFD700;'>⚡ MATRIX ULTIMATE V9.3.6</h1>", unsafe_allow_html=True)
 
 with st.sidebar:
     st.markdown("<h2 class='section-header'>💾 DỮ LIỆU</h2>", unsafe_allow_html=True)
@@ -139,12 +139,12 @@ with st.sidebar:
         st.session_state['db'] = json.load(uploaded_file)
         st.rerun()
     if st.session_state['db']['last_digits']:
-        st.download_button("💾 LƯU JSON", json.dumps(st.session_state['db']), "matrix_pro.json")
+        st.download_button("💾 LƯU JSON", json.dumps(st.session_state['db']), "matrix_v936.json")
     
     st.divider()
-    st.markdown("<h2 class='section-header'>📸 OCR</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 class='section-header'>📸 QUÉT ẢNH</h2>", unsafe_allow_html=True)
     uploaded_img = st.file_uploader("Quét ảnh", type=['jpg', 'png', 'jpeg'])
-    if uploaded_img and st.button("🔍 QUÉT"):
+    if uploaded_img and st.button("🔍 OCR"):
         reader = load_ocr()
         res = reader.readtext(np.array(Image.open(uploaded_img)), detail=0)
         nums = [n for n in res if n.isdigit() and 2 <= len(n) <= 5]
@@ -153,13 +153,13 @@ with st.sidebar:
             st.session_state['gdb_ocr'] = nums[0][-2:]
         st.rerun()
 
-    st.session_state['raw_input'] = st.text_area("Chuỗi số giải:", value=st.session_state.get('raw_input', ""), height=100)
-    gdb_confirm = st.text_input("GĐB (2 số):", value=st.session_state.get('gdb_ocr', ""), max_chars=2)
+    st.session_state['raw_input'] = st.text_area("Chuỗi giải:", value=st.session_state.get('raw_input', ""), height=100)
+    gdb_val = st.text_input("GĐB:", value=st.session_state.get('gdb_ocr', ""), max_chars=2)
 
     if st.button("🔥 CHẠY SNIPER", type="primary"):
         raw = [x.strip() for x in st.session_state['raw_input'].replace(",", " ").split() if x]
         if len("".join(raw)) >= TOTAL_POS:
-            process_matrix("".join(raw)[:TOTAL_POS], [s[-2:] for s in raw[:27]], gdb_confirm)
+            process_matrix("".join(raw)[:TOTAL_POS], [s[-2:] for s in raw[:27]], gdb_val)
             st.rerun()
     st.button("🚨 RESET ALL", on_click=lambda: st.session_state.clear())
 
@@ -167,28 +167,28 @@ with st.sidebar:
 c1, c2 = st.columns([1, 2.5])
 
 with c1:
-    st.markdown("<h2 class='section-header'>🎯 TỨ THỦ CORE 4</h2>", unsafe_allow_html=True)
+    st.markdown("""
+        <div class="report-card">
+            <h3 style="color: #000; margin-bottom: 5px;">🎯 TỨ THỦ CORE 4</h3>
+    """, unsafe_allow_html=True)
     c4 = st.session_state['db'].get('core_four', [])
     if c4:
-        st.markdown(f"""
-            <div class="report-card">
-                <p style="color: #2C3E50; font-weight: bold; margin-bottom: 5px;">SNIPER TARGETS</p>
-                <p class="metric-text">{' - '.join(c4)}</p>
-            </div>
-            """, unsafe_allow_html=True)
-    else: st.info("Nạp kỳ 1 lấy gốc, kỳ 2 có điểm.")
+        st.markdown(f"<h1 class='metric-text'>{' - '.join(c4)}</h1>", unsafe_allow_html=True)
+    else: st.info("Đang tính toán...")
+    st.markdown("</div>", unsafe_allow_html=True)
 
     st.divider()
     st.markdown("<h2 class='section-header'>📊 CHI TIẾT DÂY</h2>", unsafe_allow_html=True)
     preds = st.session_state['db'].get('last_predictions', {})
     if preds:
-        for lv in sorted([int(k) for k in preds.keys()], reverse=True):
+        sorted_keys = sorted([int(k) for k in preds.keys()], reverse=True)
+        for lv in sorted_keys:
             data = preds[str(lv)] if str(lv) in preds else preds[lv]
-            with st.expander(f"Mức {lv}đ ({len(data['nums'])} quân)"):
+            with st.expander(f"Mức {lv}đ ({len(data['nums'])}q)"):
                 st.code(", ".join(data['nums']))
 
 with c2:
-    st.markdown("<h2 class='section-header'>📋 LỊCH SỬ ĐỐI SOÁT</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 class='section-header'>📋 BÁO CÁO LỊCH SỬ</h2>", unsafe_allow_html=True)
     if st.session_state['db']['history']:
         df_hist = pd.DataFrame(st.session_state['db']['history']).fillna("0")
         cols = list(df_hist.columns)
@@ -196,16 +196,16 @@ with c2:
         for col in reversed(important):
             if col in cols: cols.insert(0, cols.pop(cols.index(col)))
         
-        # LOGIC TÔ MÀU AN TOÀN (KIỂM TRA CỘT TRƯỚC KHI TÔ)
+        # SỬA LỖI KEYERROR VÀ MÀU SẮC
         if "Kết quả" in df_hist.columns:
             st.dataframe(
                 df_hist[cols].style.map(
-                    lambda x: 'color: #5DADE2; font-weight: bold' if x == "THẮNG 🔥" else 
-                              ('color: #F1C40F' if x == "✅" else ('color: #E74C3C' if x == "❌" else '')),
+                    lambda x: 'color: #FFD700; font-weight: bold' if x == "THẮNG 🔥" else 
+                              ('color: #00FFBB' if x == "✅" else ('color: #FF4B4B' if x == "❌" else '')),
                     subset=["Kết quả"]
                 ),
                 use_container_width=True,
                 height=600
             )
         else:
-            st.dataframe(df_hist[cols], use_container_width=True, height=600)
+            st.dataframe(df_hist[cols], use_container_width=True)
