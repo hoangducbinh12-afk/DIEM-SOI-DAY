@@ -6,30 +6,29 @@ import easyocr
 from PIL import Image
 
 # --- 1. CẤU HÌNH HỆ THỐNG ---
-st.set_page_config(page_title="Matrix V9.4.0 - Sniper Filter Edge", layout="wide")
+st.set_page_config(page_title="Matrix V9.4.1 - Ultimate Sniper", layout="wide")
 TOTAL_POS = 107 
 
-# Custom CSS: Tông màu Xanh Đen - Vàng Cát trầm dịu mắt, phóng to chữ kết quả
+# Custom CSS: Thiết kế giao diện Cyber Deep trầm sang trọng, phóng to chữ hết cỡ
 st.markdown("""
     <style>
-    .main { background-color: #0F141C; }
-    .stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #1A2332; color: #E2E8F0; border: 1px solid #2D3748; }
-    .stButton>button:hover { border-color: #E2E8F0; color: white; }
+    .main { background-color: #0A0D14; }
+    .stButton>button { width: 100%; border-radius: 6px; height: 3em; background-color: #161B26; color: #F0F4F8; border: 1px solid #2D3748; font-weight: bold; }
+    .stButton>button:hover { border-color: #F59E0B; color: #F59E0B; }
     
-    /* Khung hiển thị Tứ thủ & Tam thủ tông màu trầm chuyên nghiệp */
-    .result-box-4 { background-color: #1E293B; padding: 20px; border-radius: 12px; text-align: center; border: 2px solid #D97706; margin-bottom: 15px; }
-    .result-box-3 { background-color: #1E293B; padding: 15px; border-radius: 12px; text-align: center; border: 2px solid #2563EB; margin-bottom: 15px; }
+    /* Khung hiển thị Tứ thủ & Tam thủ được thiết kế lại sang trọng, dịu mắt */
+    .result-box-4 { background-color: #111827; padding: 25px; border-radius: 15px; text-align: center; border: 3px solid #D97706; margin-bottom: 20px; box-shadow: 0px 4px 20px rgba(217,119,6,0.15); }
+    .result-box-3 { background-color: #111827; padding: 25px; border-radius: 15px; text-align: center; border: 3px solid #2563EB; margin-bottom: 20px; box-shadow: 0px 4px 20px rgba(37,99,235,0.15); }
     
-    /* Phóng to cỡ chữ cực đại */
-    .big-text-4 { color: #F59E0B; font-size: 55px; font-weight: 900; letter-spacing: 5px; margin: 0; line-height: 1.1; }
-    .big-text-3 { color: #3B82F6; font-size: 45px; font-weight: bold; letter-spacing: 5px; margin: 0; line-height: 1.1; }
+    /* Cỡ chữ được phóng to cực đại theo yêu cầu */
+    .big-text-4 { color: #FBBF24; font-size: 65px; font-weight: 900; letter-spacing: 6px; margin: 0; line-height: 1.1; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+    .big-text-3 { color: #60A5FA; font-size: 55px; font-weight: 900; letter-spacing: 6px; margin: 0; line-height: 1.1; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
     
-    .section-header { color: #94A3B8; border-bottom: 2px solid #334155; padding-bottom: 5px; margin-bottom: 15px; font-weight: bold; }
-    .stExpander { border: 1px solid #334155; background-color: #0F141C; }
+    .section-header { color: #94A3B8; border-bottom: 2px solid #1E293B; padding-bottom: 6px; margin-bottom: 20px; font-weight: bold; letter-spacing: 1px; }
+    .stExpander { border: 1px solid #1E293B; background-color: #0A0D14; border-radius: 8px; }
     </style>
     """, unsafe_allow_html=True)
 
-# Khởi tạo database an toàn
 if 'db' not in st.session_state:
     st.session_state['db'] = {
         "wire_scores": np.zeros((TOTAL_POS, TOTAL_POS), dtype=int).tolist(),
@@ -48,10 +47,10 @@ if 'raw_input' not in st.session_state: st.session_state['raw_input'] = ""
 def load_ocr():
     return easyocr.Reader(['en'])
 
-# --- 2. LOGIC TÍNH TOÁN VÀ CÁC TIÊU CHÍ LOẠI TRỪ AN TOÀN ---
+# --- 2. THUẬT TOÁN ĐỐI SOÁT VÀ LỌC MA TRẬN ---
 
 def check_and_fix_db_structure():
-    """Hàm sửa lỗi KeyError: Tự động bổ sung cấu trúc tracker nếu nạp file JSON cũ"""
+    """Đảm bảo không bị lỗi KeyError khi người dùng nạp file cấu trúc cũ"""
     db = st.session_state['db']
     if "gan_tracker" not in db or not db["gan_tracker"]:
         db["gan_tracker"] = {str(i).zfill(2): 0 for i in range(100)}
@@ -83,7 +82,7 @@ def get_filtered_power_score_4(new_wire_scores, current_digits):
         num = current_digits[r] + current_digits[c]
         mapping_1d[num] += 1
 
-    # --- THIẾT LẬP CÁC BỘ LỌC CHẶN ---
+    # Hệ thống 4 lưới lọc cấm địa
     gan_blacklist = [n for n, days in db['gan_tracker'].items() if days > 12]
     bet_blacklist = [n for n, streak in db['bet_tracker'].items() if streak >= 2]
     
@@ -138,24 +137,27 @@ def process_matrix(current_digits, current_loto, gdb_val):
     
     new_wire_scores = np.zeros((TOTAL_POS, TOTAL_POS), dtype=int)
     
-    # --- A. ĐỐI SOÁT LỊCH SỬ ---
+    # --- A. ĐỐI SOÁT LỊCH SỬ VỚI LOGIC PHÂN TÁCH MỚI ---
     hit_report = {"STT": len(db['history']) + 1, "GĐB": gdb_val}
     if old_core_4:
-        found_4 = [n for n in old_core_4 if n in current_loto]
-        count_4 = sum([current_loto.count(n) for n in found_4])
-        hit_report["Dàn 4q"] = f"{count_4} ({','.join(found_4) if found_4 else '0'})"
-        
+        # 1. Đối soát riêng cho Tam thủ (3 con đầu)
         old_tam_thu = old_core_4[:3]
         found_3 = [n for n in old_tam_thu if n in current_loto]
         count_3 = sum([current_loto.count(n) for n in found_3])
         hit_report["Dàn 3q"] = f"{count_3} ({','.join(found_3) if found_3 else '0'})"
         
-        if count_4 >= 2 or gdb_val in old_core_4:
-            hit_report["Kết quả"] = "THẮNG 🔥"
-        elif count_4 == 1:
-            hit_report["Kết quả"] = "✅"
+        # 2. Đối soát cho Tứ thủ gốc
+        found_4 = [n for n in old_core_4 if n in current_loto]
+        count_4 = sum([current_loto.count(n) for n in found_4])
+        hit_report["Dàn 4q"] = f"{count_4} ({','.join(found_4) if found_4 else '0'})"
+        
+        # 3. CHẤM ĐIỂM KẾT QUẢ THEO TIÊU CHUẨN MỚI CỦA MÀY
+        if count_3 >= 1 or gdb_val in old_tam_thu:
+            hit_report["Kết quả"] = "Win 🔥"  # Chỉ cần ăn ở Tam Thủ hoặc dính Đề Tam Thủ là WIN
+        elif count_4 >= 1:
+            hit_report["Kết quả"] = "✅"      # Tam thủ trượt nhưng ăn ở con thứ 4 của Tứ thủ
         else:
-            hit_report["Kết quả"] = "❌"
+            hit_report["Kết quả"] = "❌"      # Trắng bảng hoàn toàn
 
     if old_preds:
         fixed_preds = {int(k): v for k, v in old_preds.items()}
@@ -193,21 +195,21 @@ def process_matrix(current_digits, current_loto, gdb_val):
     st.session_state['db']['history'].insert(0, hit_report)
 
 # --- 3. GIAO DIỆN ---
-st.markdown("<h1 style='text-align: center; color: #E2E8F0; font-weight: bold;'>⚡ MATRIX V9.4.0: FILTER EDGE</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #E2E8F0; font-weight: bold;'>⚡ MATRIX PRO V9.4.1</h1>", unsafe_allow_html=True)
 
 with st.sidebar:
-    st.markdown("<h3 style='color: #94A3B8;'>💾 DỮ LIỆU</h3>", unsafe_allow_html=True)
-    uploaded_file = st.file_uploader("Nạp JSON", type=['json'])
-    if uploaded_file and st.button("📥 PHỤC HỒI"):
+    st.markdown("<h3 style='color: #94A3B8;'>💾 DỮ LIỆU CONTROL</h3>", unsafe_allow_html=True)
+    uploaded_file = st.file_uploader("Nạp JSON cấu trúc", type=['json'])
+    if uploaded_file and st.button("📥 PHỤC HỒI HỆ THỐNG"):
         st.session_state['db'] = json.load(uploaded_file)
-        check_and_fix_db_structure() # Vá lỗi ngay khi giải nén file
+        check_and_fix_db_structure()
         st.rerun()
     if st.session_state['db']['last_digits']:
-        st.download_button("💾 LƯU JSON", json.dumps(st.session_state['db']), "matrix_v940.json")
+        st.download_button("💾 XUẤT FILE MA TRẬN", json.dumps(st.session_state['db']), "matrix_v941.json")
     
     st.divider()
-    st.markdown("<h3 style='color: #94A3B8;'>📸 NHẬP KQ</h3>", unsafe_allow_html=True)
-    uploaded_img = st.file_uploader("Quét ảnh", type=['jpg', 'png', 'jpeg'])
+    st.markdown("<h3 style='color: #94A3B8;'>📸 CAMERA QUÉT ảnh</h3>", unsafe_allow_html=True)
+    uploaded_img = st.file_uploader("Chọn ảnh kết quả", type=['jpg', 'png', 'jpeg'])
     if uploaded_img and st.button("QUÉT OCR"):
         reader = load_ocr()
         res = reader.readtext(np.array(Image.open(uploaded_img)), detail=0)
@@ -217,61 +219,61 @@ with st.sidebar:
             st.session_state['gdb_ocr'] = nums[0][-2:]
         st.rerun()
 
-    st.session_state['raw_input'] = st.text_area("Chuỗi giải:", value=st.session_state.get('raw_input', ""), height=100)
-    gdb_val = st.text_input("GĐB:", value=st.session_state.get('gdb_ocr', ""), max_chars=2)
+    st.session_state['raw_input'] = st.text_area("Bảng kết quả thô:", value=st.session_state.get('raw_input', ""), height=100)
+    gdb_val = st.text_input("Đặc biệt (2 số):", value=st.session_state.get('gdb_ocr', ""), max_chars=2)
 
-    if st.button("🔥 CHẠY SNIPER V9.4.0", type="primary"):
+    if st.button("🔥 CHẠY ASSASSIN SNIPER", type="primary"):
         raw = [x.strip() for x in st.session_state['raw_input'].replace(",", " ").split() if x]
         if len("".join(raw)) >= TOTAL_POS:
             process_matrix("".join(raw)[:TOTAL_POS], [s[-2:] for s in raw[:27]], gdb_val)
             st.rerun()
-    st.button("🚨 RESET ALL", on_click=lambda: st.session_state.clear())
+    st.button("🚨 XÓA BẢNG TẠM", on_click=lambda: st.session_state.clear())
 
-# --- 4. HIỂN THỊ TRỰC QUAN ---
-c1, c2 = st.columns([1.2, 2.3])
+# --- 4. KHU VỰC HIỂN THỊ CHÍNH ---
+c1, c2 = st.columns([1.3, 2.2])
 
 with c1:
-    st.markdown("<h2 class='section-header'>🎯 KẾT QUẢ DỰ ĐOÁN</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 class='section-header'>🎯 TỌA ĐỘ PHÁT LỰC</h2>", unsafe_allow_html=True)
     c4 = st.session_state['db'].get('core_four', [])
     
     if c4:
-        # Khung hiển thị Tứ thủ siêu to khổng lồ
+        # Khung Tứ Thủ chữ vàng to khổng lồ (65px)
         st.markdown(f"""
             <div class="result-box-4">
-                <p style="color: #94A3B8; font-size: 14px; font-weight: bold; margin-bottom: 5px;">🎯 TÚ THỦ CORE 4</p>
+                <p style="color: #94A3B8; font-size: 14px; font-weight: bold; margin-bottom: 5px;">🎯 TỨ THỦ CHIẾN THUẬT</p>
                 <p class="big-text-4">{' - '.join(c4)}</p>
             </div>
             """, unsafe_allow_html=True)
             
-        # Khung hiển thị Tam thủ siêu to khổng lồ
+        # Khung Tam Thủ chữ xanh to khổng lồ (55px)
         st.markdown(f"""
             <div class="result-box-3">
-                <p style="color: #94A3B8; font-size: 14px; font-weight: bold; margin-bottom: 5px;">🔥 TAM THỦ RÚT GỌN</p>
+                <p style="color: #94A3B8; font-size: 14px; font-weight: bold; margin-bottom: 5px;">🔥 TAM THỦ CHỦ LỰC</p>
                 <p class="big-text-3">{' - '.join(c4[:3])}</p>
             </div>
             """, unsafe_allow_html=True)
     else:
-        st.info("Đang tính toán...")
+        st.info("Hệ thống đang tích lũy xung nhịp. Hãy nạp kỳ tiếp theo.")
 
     st.divider()
     check_and_fix_db_structure()
-    with st.expander("🚫 Thống kê Bộ lọc Chặn"):
+    with st.expander("🚫 Hệ thống chặn quân tự động"):
         gan_list = [n for n, days in st.session_state['db']['gan_tracker'].items() if days > 12]
         bet_list = [n for n, streak in st.session_state['db']['bet_tracker'].items() if streak >= 2]
-        st.write(f"**Gan > 12 ngày:** {', '.join(gan_list) if gan_list else 'Trống'}")
-        st.write(f"**Bệt >= 2 ngày:** {', '.join(bet_list) if bet_list else 'Trống'}")
+        st.write(f"**Lô Gan (>12 ngày):** {', '.join(gan_list) if gan_list else 'Trống'}")
+        st.write(f"**Lô Bệt (>=2 ngày):** {', '.join(bet_list) if bet_list else 'Trống'}")
 
-    st.markdown("<h2 class='section-header'>📊 CHI TIẾT DÂY</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 class='section-header'>📊 ĐIỂM SỐ SỢI DÂY</h2>", unsafe_allow_html=True)
     preds = st.session_state['db'].get('last_predictions', {})
     if preds:
         sorted_keys = sorted([int(k) for k in preds.keys()], reverse=True)
         for lv in sorted_keys:
             data = preds[str(lv)] if str(lv) in preds else preds[lv]
-            with st.expander(f"Mức {lv}đ ({len(data['nums'])}q)"):
+            with st.expander(f"Mức {lv}đ ({len(data['nums'])} quân)"):
                 st.code(", ".join(data['nums']))
 
 with c2:
-    st.markdown("<h2 class='section-header'>📋 BÁO CÁO LỊCH SỬ</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 class='section-header'>📋 BẢNG THỐNG KÊ LỊCH SỬ ĐỐI SOÁT</h2>", unsafe_allow_html=True)
     if st.session_state['db']['history']:
         df_hist = pd.DataFrame(st.session_state['db']['history']).fillna("0")
         cols = list(df_hist.columns)
@@ -282,12 +284,12 @@ with c2:
         if "Kết quả" in df_hist.columns:
             st.dataframe(
                 df_hist[cols].style.map(
-                    lambda x: 'color: #F59E0B; font-weight: bold' if x == "THẮNG 🔥" else 
+                    lambda x: 'color: #F59E0B; font-weight: bold' if x == "Win 🔥" else 
                               ('color: #10B981' if x == "✅" else ('color: #EF4444' if x == "❌" else '')),
                     subset=["Kết quả"]
                 ),
                 use_container_width=True,
-                height=600
+                height=650
             )
         else:
             st.dataframe(df_hist[cols], use_container_width=True)
