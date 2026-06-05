@@ -6,10 +6,10 @@ import easyocr
 from PIL import Image
 
 # --- 1. CẤU HÌNH HỆ THỐNG ---
-st.set_page_config(page_title="Matrix V9.4.6 - Mobile Sniper", layout="wide")
+st.set_page_config(page_title="Matrix V9.4.7 - Mobile Sniper", layout="wide")
 TOTAL_POS = 107 
 
-# Custom CSS khóa chết giao diện tối cho Mobile, chống tràn, co giãn chữ tự động
+# Custom CSS khóa chết giao diện tối, ép số trên 1 hàng duy nhất
 st.markdown("""
     <style>
     .main { background-color: #0A0D14; padding: 10px; }
@@ -17,24 +17,13 @@ st.markdown("""
     .stButton>button:hover { border-color: #FFD700; color: #FFD700; }
     .stExpander { border: 1px solid #1E293B; background-color: #0A0D14; border-radius: 8px; }
     
-    /* Thiết lập Tiêu đề Đỏ đậm nét chuẩn cho Mobile */
-    .mobile-header-red {
-        color: #FF1E27 !important;
-        font-size: 1.4rem !important;
-        font-weight: 900 !important;
-        letter-spacing: 1px;
-        margin-top: 20px !important;
-        margin-bottom: 5px !important;
-        text-transform: uppercase;
-    }
+    /* Cấu hình khung nền đen sâu */
+    .mobile-box-3 { background-color: #030508; padding: 12px 5px; border-radius: 12px; text-align: center; border: 3px solid #2563EB; margin-bottom: 12px; overflow: hidden; }
+    .mobile-box-4 { background-color: #030508; padding: 12px 5px; border-radius: 12px; text-align: center; border: 3px solid #D97706; margin-bottom: 15px; overflow: hidden; }
     
-    /* Khung hiển thị co giãn theo màn hình điện thoại (Responsive Viewport) */
-    .mobile-box-3 { background-color: #030508; padding: 12px 5px; border-radius: 12px; text-align: center; border: 3px solid #2563EB; margin-bottom: 12px; }
-    .mobile-box-4 { background-color: #030508; padding: 12px 5px; border-radius: 12px; text-align: center; border: 3px solid #D97706; margin-bottom: 15px; }
-    
-    /* Font số cực đại tự co giãn không sợ tràn dòng trên Mobile */
-    .mobile-text-3 { color: #FF1E27 !important; font-size: 14vw !important; font-weight: 900 !important; font-family: monospace; letter-spacing: 2px; margin: 0; line-height: 1.1; }
-    .mobile-text-4 { color: #FFD700 !important; font-size: 10vw !important; font-weight: 900 !important; font-family: monospace; letter-spacing: 1px; margin: 0; line-height: 1.1; }
+    /* ÉP BUỘC CHỮ NẰM TRÊN 1 HÀNG, KHÔNG XUỐNG DÒNG (nowrap) */
+    .mobile-text-3 { color: #FF1E27 !important; font-size: 10vw !important; font-weight: 900 !important; font-family: monospace; letter-spacing: 1px; margin: 0; line-height: 1.1; white-space: nowrap !important; }
+    .mobile-text-4 { color: #FFD700 !important; font-size: 8vw !important; font-weight: 900 !important; font-family: monospace; letter-spacing: 1px; margin: 0; line-height: 1.1; white-space: nowrap !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -56,7 +45,7 @@ if 'raw_input' not in st.session_state: st.session_state['raw_input'] = ""
 def load_ocr():
     return easyocr.Reader(['en'])
 
-# --- 2. LOGIC TOÁN HỌC MA TRẬN VÀ BỘ LỌC CHẶN (GIỮ NGUYÊN) ---
+# --- 2. LOGIC TOÁN HỌC MA TRẬN VÀ BỘ LỌC CHẶN ---
 
 def check_and_fix_db_structure():
     db = st.session_state['db']
@@ -197,10 +186,9 @@ def process_matrix(current_digits, current_loto, gdb_val):
     st.session_state['db']['core_four'] = get_filtered_power_score_4(new_wire_scores, current_digits)
     st.session_state['db']['history'].insert(0, hit_report)
 
-# --- 3. GIAO DIỆN CHÍNH (ĐÃ THAY ĐỔI THEO TRỤC DỌC CHO MOBILE) ---
-st.markdown("<h2 style='text-align: center; color: #E2E8F0; font-weight: bold; font-size: 1.6rem;'>⚡ MATRIX MOBILE V9.4.6</h2>", unsafe_allow_html=True)
+# --- 3. GIAO DIỆN CHÍNH TRỤC DỌC ---
+st.markdown("<h2 style='text-align: center; color: #E2E8F0; font-weight: bold; font-size: 1.5rem;'>⚡ MATRIX MOBILE V9.4.7</h2>", unsafe_allow_html=True)
 
-# Sidebar thu gọn khu vực nạp dữ liệu để nhường chỗ hiển thị
 with st.sidebar:
     st.markdown("### 💾 HỆ THỐNG DATA")
     uploaded_file = st.file_uploader("Nạp JSON", type=['json'])
@@ -233,13 +221,13 @@ with st.sidebar:
             st.rerun()
     st.button("🚨 XÓA BẢNG TẠM", on_click=lambda: st.session_state.clear())
 
-# --- KẾT QUẢ HIỂN THỊ DỌC (KHÔNG CHIA CỘT CHỐNG TRÀN MOBILE) ---
-st.markdown("<p class='mobile-header-red'>🎯 TỌA ĐỘ PHÁT LỰC</p>", unsafe_allow_html=True)
+# --- HIỂN THỊ KẾT QUẢ ---
+st.markdown("<h3><font color='#FF1E27'><b>🎯 TỌA ĐỘ PHÁT LỰC</b></font></h3>", unsafe_allow_html=True)
 st.markdown("<hr style='border: 1px solid #FF1E27; margin-top: -5px; margin-bottom: 15px;'>", unsafe_allow_html=True)
 
 c4 = st.session_state['db'].get('core_four', [])
 if c4:
-    # Ô Tam Thủ: Ép chữ Đỏ rực siêu lớn theo đơn vị màn hình dọc (vw)
+    # Tam Thủ 1 hàng ngang duy nhất
     tam_thu_str = ' - '.join(c4[:3])
     st.markdown(f"""
         <div class="mobile-box-3">
@@ -248,7 +236,7 @@ if c4:
         </div>
         """, unsafe_allow_html=True)
 
-    # Ô Tứ Thủ: Ép chữ Vàng chói siêu lớn theo đơn vị màn hình dọc (vw)
+    # Tứ Thủ 1 hàng ngang duy nhất
     tu_thu_str = ' - '.join(c4)
     st.markdown(f"""
         <div class="mobile-box-4">
@@ -267,7 +255,7 @@ with st.expander("🚫 Hệ thống chặn số tự động"):
     st.write(f"**Lô Bệt (>=2 ngày):** {', '.join(bet_list) if bet_list else 'Trống'}")
 
 # MỨC ĐIỂM DÂY
-st.markdown("<p class='mobile-header-red'>📊 ĐIỂM SỐ SỢI DÂY</p>", unsafe_allow_html=True)
+st.markdown("<h3><font color='#FF1E27'><b>📊 ĐIỂM SỐ SỢI DÂY</b></font></h3>", unsafe_allow_html=True)
 st.markdown("<hr style='border: 1px solid #FF1E27; margin-top: -5px; margin-bottom: 15px;'>", unsafe_allow_html=True)
 
 preds = st.session_state['db'].get('last_predictions', {})
@@ -278,8 +266,8 @@ if preds:
         with st.expander(f"Mức {lv}đ ({len(data['nums'])} quân)"):
             st.code(", ".join(data['nums']))
 
-# BẢNG LỊCH SỬ DƯỚI CÙNG
-st.markdown("<p class='mobile-header-red'>📋 LỊCH SỬ ĐỐI SOÁT KẾT QUẢ</p>", unsafe_allow_html=True)
+# BẢNG LỊCH SỬ
+st.markdown("<h3><font color='#FF1E27'><b>📋 LỊCH SỬ ĐỐI SOÁT KẾT QUẢ</b></font></h3>", unsafe_allow_html=True)
 st.markdown("<hr style='border: 1px solid #FF1E27; margin-top: -5px; margin-bottom: 15px;'>", unsafe_allow_html=True)
 
 if st.session_state['db']['history']:
