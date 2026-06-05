@@ -6,23 +6,23 @@ import easyocr
 from PIL import Image
 
 # --- 1. CẤU HÌNH HỆ THỐNG ---
-st.set_page_config(page_title="Matrix V9.4.1 - Ultimate Sniper", layout="wide")
+st.set_page_config(page_title="Matrix V9.4.2 - Big Font Sniper", layout="wide")
 TOTAL_POS = 107 
 
-# Custom CSS: Thiết kế giao diện Cyber Deep trầm sang trọng, phóng to chữ hết cỡ
+# Custom CSS: Nền Deep Cyber Black, phóng chữ Tam Thủ/Tứ Thủ to gần kín nền đen
 st.markdown("""
     <style>
     .main { background-color: #0A0D14; }
     .stButton>button { width: 100%; border-radius: 6px; height: 3em; background-color: #161B26; color: #F0F4F8; border: 1px solid #2D3748; font-weight: bold; }
-    .stButton>button:hover { border-color: #F59E0B; color: #F59E0B; }
+    .stButton>button:hover { border-color: #FFD700; color: #FFD700; }
     
-    /* Khung hiển thị Tứ thủ & Tam thủ được thiết kế lại sang trọng, dịu mắt */
-    .result-box-4 { background-color: #111827; padding: 25px; border-radius: 15px; text-align: center; border: 3px solid #D97706; margin-bottom: 20px; box-shadow: 0px 4px 20px rgba(217,119,6,0.15); }
-    .result-box-3 { background-color: #111827; padding: 25px; border-radius: 15px; text-align: center; border: 3px solid #2563EB; margin-bottom: 20px; box-shadow: 0px 4px 20px rgba(37,99,235,0.15); }
+    /* Khung nền đen sâu để làm nổi bật màu chữ kích thước lớn */
+    .result-box-4 { background-color: #05070B; padding: 15px 10px; border-radius: 12px; text-align: center; border: 3px solid #D97706; margin-bottom: 20px; box-shadow: 0px 4px 20px rgba(217,119,6,0.2); }
+    .result-box-3 { background-color: #05070B; padding: 15px 10px; border-radius: 12px; text-align: center; border: 3px solid #2563EB; margin-bottom: 20px; box-shadow: 0px 4px 20px rgba(37,99,235,0.2); }
     
-    /* Cỡ chữ được phóng to cực đại theo yêu cầu */
-    .big-text-4 { color: #FBBF24; font-size: 65px; font-weight: 900; letter-spacing: 6px; margin: 0; line-height: 1.1; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
-    .big-text-3 { color: #60A5FA; font-size: 55px; font-weight: 900; letter-spacing: 6px; margin: 0; line-height: 1.1; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+    /* Cấu hình chữ to khổng lồ, in đậm, chiếm gần trọn không gian khung đen */
+    .big-text-4 { color: #FFD700; font-size: 80px; font-weight: 900; letter-spacing: 4px; margin: 0; line-height: 1.0; text-shadow: 3px 3px 5px rgba(0,0,0,0.8); }
+    .big-text-3 { color: #FF1E27; font-size: 85px; font-weight: 900; letter-spacing: 4px; margin: 0; line-height: 1.0; text-shadow: 3px 3px 5px rgba(0,0,0,0.8); }
     
     .section-header { color: #94A3B8; border-bottom: 2px solid #1E293B; padding-bottom: 6px; margin-bottom: 20px; font-weight: bold; letter-spacing: 1px; }
     .stExpander { border: 1px solid #1E293B; background-color: #0A0D14; border-radius: 8px; }
@@ -47,10 +47,9 @@ if 'raw_input' not in st.session_state: st.session_state['raw_input'] = ""
 def load_ocr():
     return easyocr.Reader(['en'])
 
-# --- 2. THUẬT TOÁN ĐỐI SOÁT VÀ LỌC MA TRẬN ---
+# --- 2. LOGIC TOÁN HỌC MA TRẬN VÀ KIỂM SOÁT BỘ LỌC ---
 
 def check_and_fix_db_structure():
-    """Đảm bảo không bị lỗi KeyError khi người dùng nạp file cấu trúc cũ"""
     db = st.session_state['db']
     if "gan_tracker" not in db or not db["gan_tracker"]:
         db["gan_tracker"] = {str(i).zfill(2): 0 for i in range(100)}
@@ -82,7 +81,6 @@ def get_filtered_power_score_4(new_wire_scores, current_digits):
         num = current_digits[r] + current_digits[c]
         mapping_1d[num] += 1
 
-    # Hệ thống 4 lưới lọc cấm địa
     gan_blacklist = [n for n, days in db['gan_tracker'].items() if days > 12]
     bet_blacklist = [n for n, streak in db['bet_tracker'].items() if streak >= 2]
     
@@ -137,27 +135,25 @@ def process_matrix(current_digits, current_loto, gdb_val):
     
     new_wire_scores = np.zeros((TOTAL_POS, TOTAL_POS), dtype=int)
     
-    # --- A. ĐỐI SOÁT LỊCH SỬ VỚI LOGIC PHÂN TÁCH MỚI ---
+    # --- ĐỐI SOÁT LỊCH SỬ ---
     hit_report = {"STT": len(db['history']) + 1, "GĐB": gdb_val}
     if old_core_4:
-        # 1. Đối soát riêng cho Tam thủ (3 con đầu)
         old_tam_thu = old_core_4[:3]
         found_3 = [n for n in old_tam_thu if n in current_loto]
         count_3 = sum([current_loto.count(n) for n in found_3])
         hit_report["Dàn 3q"] = f"{count_3} ({','.join(found_3) if found_3 else '0'})"
         
-        # 2. Đối soát cho Tứ thủ gốc
         found_4 = [n for n in old_core_4 if n in current_loto]
         count_4 = sum([current_loto.count(n) for n in found_4])
         hit_report["Dàn 4q"] = f"{count_4} ({','.join(found_4) if found_4 else '0'})"
         
-        # 3. CHẤM ĐIỂM KẾT QUẢ THEO TIÊU CHUẨN MỚI CỦA MÀY
+        # Logic đối soát chuẩn: Ăn Tam Thủ là báo WIN luôn
         if count_3 >= 1 or gdb_val in old_tam_thu:
-            hit_report["Kết quả"] = "Win 🔥"  # Chỉ cần ăn ở Tam Thủ hoặc dính Đề Tam Thủ là WIN
+            hit_report["Kết quả"] = "Win 🔥"
         elif count_4 >= 1:
-            hit_report["Kết quả"] = "✅"      # Tam thủ trượt nhưng ăn ở con thứ 4 của Tứ thủ
+            hit_report["Kết quả"] = "✅"
         else:
-            hit_report["Kết quả"] = "❌"      # Trắng bảng hoàn toàn
+            hit_report["Kết quả"] = "❌"
 
     if old_preds:
         fixed_preds = {int(k): v for k, v in old_preds.items()}
@@ -166,7 +162,6 @@ def process_matrix(current_digits, current_loto, gdb_val):
             found = [n for n in nums if n in current_loto]
             hit_report[f"{lv}đ"] = f"{sum([current_loto.count(n) for n in found])}"
 
-    # --- B. CẬP NHẬT ĐIỂM ---
     if len(old_digits) == TOTAL_POS:
         for i in range(TOTAL_POS):
             for j in range(TOTAL_POS):
@@ -194,8 +189,8 @@ def process_matrix(current_digits, current_loto, gdb_val):
     st.session_state['db']['core_four'] = get_filtered_power_score_4(new_wire_scores, current_digits)
     st.session_state['db']['history'].insert(0, hit_report)
 
-# --- 3. GIAO DIỆN ---
-st.markdown("<h1 style='text-align: center; color: #E2E8F0; font-weight: bold;'>⚡ MATRIX PRO V9.4.1</h1>", unsafe_allow_html=True)
+# --- 3. GIAO DIỆN STREAMLIT ---
+st.markdown("<h1 style='text-align: center; color: #E2E8F0; font-weight: bold;'>⚡ MATRIX PRO V9.4.2</h1>", unsafe_allow_html=True)
 
 with st.sidebar:
     st.markdown("<h3 style='color: #94A3B8;'>💾 DỮ LIỆU CONTROL</h3>", unsafe_allow_html=True)
@@ -205,10 +200,10 @@ with st.sidebar:
         check_and_fix_db_structure()
         st.rerun()
     if st.session_state['db']['last_digits']:
-        st.download_button("💾 XUẤT FILE MA TRẬN", json.dumps(st.session_state['db']), "matrix_v941.json")
+        st.download_button("💾 XUẤT FILE MA TRẬN", json.dumps(st.session_state['db']), "matrix_v942.json")
     
     st.divider()
-    st.markdown("<h3 style='color: #94A3B8;'>📸 CAMERA QUÉT ảnh</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #94A3B8;'>📸 CAMERA QUÉT ẢNH</h3>", unsafe_allow_html=True)
     uploaded_img = st.file_uploader("Chọn ảnh kết quả", type=['jpg', 'png', 'jpeg'])
     if uploaded_img and st.button("QUÉT OCR"):
         reader = load_ocr()
@@ -230,26 +225,26 @@ with st.sidebar:
     st.button("🚨 XÓA BẢNG TẠM", on_click=lambda: st.session_state.clear())
 
 # --- 4. KHU VỰC HIỂN THỊ CHÍNH ---
-c1, c2 = st.columns([1.3, 2.2])
+c1, c2 = st.columns([1.4, 2.1])
 
 with c1:
     st.markdown("<h2 class='section-header'>🎯 TỌA ĐỘ PHÁT LỰC</h2>", unsafe_allow_html=True)
     c4 = st.session_state['db'].get('core_four', [])
     
     if c4:
-        # Khung Tứ Thủ chữ vàng to khổng lồ (65px)
-        st.markdown(f"""
-            <div class="result-box-4">
-                <p style="color: #94A3B8; font-size: 14px; font-weight: bold; margin-bottom: 5px;">🎯 TỨ THỦ CHIẾN THUẬT</p>
-                <p class="big-text-4">{' - '.join(c4)}</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-        # Khung Tam Thủ chữ xanh to khổng lồ (55px)
+        # Khung Tam Thủ: Số màu Đỏ, in đậm, phóng to 85px chiếm gần hết nền đen
         st.markdown(f"""
             <div class="result-box-3">
-                <p style="color: #94A3B8; font-size: 14px; font-weight: bold; margin-bottom: 5px;">🔥 TAM THỦ CHỦ LỰC</p>
+                <p style="color: #94A3B8; font-size: 13px; font-weight: bold; margin-bottom: 5px;">🔥 TAM THỦ CHỦ LỰC (MÀU ĐỎ)</p>
                 <p class="big-text-3">{' - '.join(c4[:3])}</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # Khung Tứ Thủ: Số màu Vàng, in đậm, phóng to 80px chiếm gần hết nền đen
+        st.markdown(f"""
+            <div class="result-box-4">
+                <p style="color: #94A3B8; font-size: 13px; font-weight: bold; margin-bottom: 5px;">🎯 TỨ THỦ CHIẾN THUẬT (MÀU VÀNG)</p>
+                <p class="big-text-4">{' - '.join(c4)}</p>
             </div>
             """, unsafe_allow_html=True)
     else:
