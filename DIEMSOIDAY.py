@@ -6,10 +6,10 @@ import easyocr
 from PIL import Image
 
 # --- 1. CẤU HÌNH HỆ THỐNG ---
-st.set_page_config(page_title="Matrix V9.4.4 - Ultimate Max Font", layout="wide")
+st.set_page_config(page_title="Matrix V9.4.5 - Perfect Max Font", layout="wide")
 TOTAL_POS = 107 
 
-# Giao diện nền đen sâu huyền bí
+# Thiết lập nền tối cho toàn ứng dụng
 st.markdown("""
     <style>
     .main { background-color: #0A0D14; }
@@ -217,25 +217,36 @@ with st.sidebar:
 c1, c2 = st.columns([1.6, 1.9])
 
 with c1:
-    # KHÓA CHẾT TIÊU ĐỀ MÀU ĐỎ RỰC - IN ĐẬM TUYỆT ĐỐI KHÔNG BỊ TRÈN LÊN TRÊN
-    st.markdown("<div style='color: #FF1E27 !important; border-bottom: 2px solid #FF1E27; padding-bottom: 6px; margin-bottom: 20px; font-weight: 900 !important; font-size: 26px !important; text-transform: uppercase;'>🎯 TỌA ĐỘ PHÁT LỰC</div>", unsafe_allow_html=True)
+    # SỬ DỤNG THẺ HTML GỐC: KHÓA CHẾT TIÊU ĐỀ MÀU ĐỎ RỰC, IN ĐẬM TUYỆT ĐỐI
+    st.markdown("<h3><font color='#FF1E27'><b>🎯 TỌA ĐỘ PHÁT LỰC</b></font></h3>", unsafe_allow_html=True)
+    st.markdown("<hr style='border: 1px solid #FF1E27; margin-top: -10px; margin-bottom: 20px;'>", unsafe_allow_html=True)
     
     c4 = st.session_state['db'].get('core_four', [])
     if c4:
-        # Khung Tam Thủ: Ép trực tiếp màu Đỏ rực, size 120px cực đại, triệt tiêu khoảng trống thừa
+        # Khung Tam Thủ: Số màu Đỏ rực, in đậm, dùng cấu trúc bảng HTML ép size khổng lồ tràn nền đen
+        tam_thu_str = ' - '.join(c4[:3])
         st.markdown(f"""
-            <div style="background-color: #030508; padding: 5px 0px; border-radius: 12px; text-align: center; border: 3px solid #2563EB; margin-bottom: 15px;">
-                <p style="color: #94A3B8; font-size: 14px; font-weight: bold; margin: 0; padding-bottom: 2px;">🔥 TAM THỦ CHỦ LỰC</p>
-                <p style="color: #FF1E27 !important; font-size: 120px !important; font-weight: 900 !important; letter-spacing: 2px; margin: 0 !important; padding: 0 !important; line-height: 1.0; text-shadow: 2px 2px 4px rgba(0,0,0,0.9); font-family: monospace;">{' - '.join(c4[:3])}</p>
-            </div>
+            <table width="100%" style="background-color: #030508; border-radius: 12px; border: 3px solid #2563EB; border-collapse: separate; margin-bottom: 15px;">
+                <tr>
+                    <td align="center" style="padding: 10px 0px;">
+                        <span style="color: #94A3B8; font-size: 14px; font-weight: bold; font-family: sans-serif;">🔥 TAM THỦ CHỦ LỰC</span><br>
+                        <span style="color: #FF1E27; font-size: 72px; font-weight: 900; font-family: monospace; letter-spacing: 5px;"><b>{tam_thu_str}</b></span>
+                    </td>
+                </tr>
+            </table>
             """, unsafe_allow_html=True)
 
-        # Khung Tứ Thủ: Ép trực tiếp màu Vàng chói, size 100px cực đại, triệt tiêu khoảng trống thừa
+        # Khung Tứ Thủ: Số màu Vàng chói, in đậm, dùng cấu trúc bảng HTML ép size khổng lồ tràn nền đen
+        tu_thu_str = ' - '.join(c4)
         st.markdown(f"""
-            <div style="background-color: #030508; padding: 5px 0px; border-radius: 12px; text-align: center; border: 3px solid #D97706; margin-bottom: 15px;">
-                <p style="color: #94A3B8; font-size: 14px; font-weight: bold; margin: 0; padding-bottom: 2px;">🎯 TỨ THỦ CHIẾN THUẬT</p>
-                <p style="color: #FFD700 !important; font-size: 100px !important; font-weight: 900 !important; letter-spacing: 2px; margin: 0 !important; padding: 0 !important; line-height: 1.0; text-shadow: 2px 2px 4px rgba(0,0,0,0.9); font-family: monospace;">{' - '.join(c4)}</p>
-            </div>
+            <table width="100%" style="background-color: #030508; border-radius: 12px; border: 3px solid #D97706; border-collapse: separate; margin-bottom: 15px;">
+                <tr>
+                    <td align="center" style="padding: 10px 0px;">
+                        <span style="color: #94A3B8; font-size: 14px; font-weight: bold; font-family: sans-serif;">🎯 TỨ THỦ CHIẾN THUẬT</span><br>
+                        <span style="color: #FFD700; font-size: 58px; font-weight: 900; font-family: monospace; letter-spacing: 3px;"><b>{tu_thu_str}</b></span>
+                    </td>
+                </tr>
+            </table>
             """, unsafe_allow_html=True)
     else:
         st.info("Hệ thống đang tích lũy xung nhịp. Hãy nạp kỳ tiếp theo.")
@@ -248,8 +259,10 @@ with c1:
         st.write(f"**Lô Gan (>12 ngày):** {', '.join(gan_list) if gan_list else 'Trống'}")
         st.write(f"**Lô Bệt (>=2 ngày):** {', '.join(bet_list) if bet_list else 'Trống'}")
 
-    # KHÓA CHẾT TIÊU ĐỀ MÀU ĐỎ RỰC Ở KHU VỰC DÂY
-    st.markdown("<div style='color: #FF1E27 !important; border-bottom: 2px solid #FF1E27; padding-bottom: 6px; margin-bottom: 20px; font-weight: 900 !important; font-size: 26px !important; text-transform: uppercase;'>📊 ĐIỂM SỐ SỢI DÂY</div>", unsafe_allow_html=True)
+    # TIÊU ĐỀ MÀU ĐỎ RỰC Ở KHU VỰC DÂY
+    st.markdown("<h3><font color='#FF1E27'><b>📊 ĐIỂM SỐ SỢI DÂY</b></font></h3>", unsafe_allow_html=True)
+    st.markdown("<hr style='border: 1px solid #FF1E27; margin-top: -10px; margin-bottom: 20px;'>", unsafe_allow_html=True)
+    
     preds = st.session_state['db'].get('last_predictions', {})
     if preds:
         sorted_keys = sorted([int(k) for k in preds.keys()], reverse=True)
@@ -259,8 +272,10 @@ with c1:
                 st.code(", ".join(data['nums']))
 
 with c2:
-    # KHÓA CHẾT TIÊU ĐỀ MÀU ĐỎ RỰC Ở BÊN BÁO CÁO LỊCH SỬ
-    st.markdown("<div style='color: #FF1E27 !important; border-bottom: 2px solid #FF1E27; padding-bottom: 6px; margin-bottom: 20px; font-weight: 900 !important; font-size: 26px !important; text-transform: uppercase;'>📋 BẢNG THỐNG KÊ LỊCH SỬ ĐỐI SOÁT</div>", unsafe_allow_html=True)
+    # TIÊU ĐỀ MÀU ĐỎ RỰC Ở BÊN BÁO CÁO LỊCH SỬ
+    st.markdown("<h3><font color='#FF1E27'><b>📋 BẢNG THỐNG KÊ LỊCH SỬ ĐỐI SOÁT</b></font></h3>", unsafe_allow_html=True)
+    st.markdown("<hr style='border: 1px solid #FF1E27; margin-top: -10px; margin-bottom: 20px;'>", unsafe_allow_html=True)
+    
     if st.session_state['db']['history']:
         df_hist = pd.DataFrame(st.session_state['db']['history']).fillna("0")
         cols = list(df_hist.columns)
