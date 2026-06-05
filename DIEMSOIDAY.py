@@ -6,25 +6,26 @@ import easyocr
 from PIL import Image
 
 # --- 1. CẤU HÌNH HỆ THỐNG ---
-st.set_page_config(page_title="Matrix V9.4.2 - Big Font Sniper", layout="wide")
+st.set_page_config(page_title="Matrix V9.4.3 - Max Font Sniper", layout="wide")
 TOTAL_POS = 107 
 
-# Custom CSS: Nền Deep Cyber Black, phóng chữ Tam Thủ/Tứ Thủ to gần kín nền đen
+# Custom CSS: Nền đen, tiêu đề đỏ in đậm, phóng số to khổng lồ chiếm trọn khung
 st.markdown("""
     <style>
     .main { background-color: #0A0D14; }
     .stButton>button { width: 100%; border-radius: 6px; height: 3em; background-color: #161B26; color: #F0F4F8; border: 1px solid #2D3748; font-weight: bold; }
     .stButton>button:hover { border-color: #FFD700; color: #FFD700; }
     
-    /* Khung nền đen sâu để làm nổi bật màu chữ kích thước lớn */
-    .result-box-4 { background-color: #05070B; padding: 15px 10px; border-radius: 12px; text-align: center; border: 3px solid #D97706; margin-bottom: 20px; box-shadow: 0px 4px 20px rgba(217,119,6,0.2); }
-    .result-box-3 { background-color: #05070B; padding: 15px 10px; border-radius: 12px; text-align: center; border: 3px solid #2563EB; margin-bottom: 20px; box-shadow: 0px 4px 20px rgba(37,99,235,0.2); }
+    /* Khung nền đen sâu tối giản diện tích thừa để số bung to nhất */
+    .result-box-4 { background-color: #05070B; padding: 5px 2px; border-radius: 12px; text-align: center; border: 3px solid #D97706; margin-bottom: 15px; }
+    .result-box-3 { background-color: #05070B; padding: 5px 2px; border-radius: 12px; text-align: center; border: 3px solid #2563EB; margin-bottom: 15px; }
     
-    /* Cấu hình chữ to khổng lồ, in đậm, chiếm gần trọn không gian khung đen */
-    .big-text-4 { color: #FFD700; font-size: 80px; font-weight: 900; letter-spacing: 4px; margin: 0; line-height: 1.0; text-shadow: 3px 3px 5px rgba(0,0,0,0.8); }
-    .big-text-3 { color: #FF1E27; font-size: 85px; font-weight: 900; letter-spacing: 4px; margin: 0; line-height: 1.0; text-shadow: 3px 3px 5px rgba(0,0,0,0.8); }
+    /* Kích thước chữ siêu bạo chúa, sát viền khung đen */
+    .big-text-4 { color: #FFD700; font-size: 100px; font-weight: 900; letter-spacing: 2px; margin: 0; line-height: 1.0; text-shadow: 2px 2px 4px rgba(0,0,0,0.9); }
+    .big-text-3 { color: #FF1E27; font-size: 110px; font-weight: 900; letter-spacing: 2px; margin: 0; line-height: 1.0; text-shadow: 2px 2px 4px rgba(0,0,0,0.9); }
     
-    .section-header { color: #94A3B8; border-bottom: 2px solid #1E293B; padding-bottom: 6px; margin-bottom: 20px; font-weight: bold; letter-spacing: 1px; }
+    /* TIÊU ĐỀ MÀU ĐỎ IN ĐẬM THEO YÊU CẦU */
+    .section-header-red { color: #FF1E27; border-bottom: 2px solid #FF1E27; padding-bottom: 6px; margin-bottom: 20px; font-weight: 900; font-size: 24px; letter-spacing: 1px; }
     .stExpander { border: 1px solid #1E293B; background-color: #0A0D14; border-radius: 8px; }
     </style>
     """, unsafe_allow_html=True)
@@ -147,7 +148,6 @@ def process_matrix(current_digits, current_loto, gdb_val):
         count_4 = sum([current_loto.count(n) for n in found_4])
         hit_report["Dàn 4q"] = f"{count_4} ({','.join(found_4) if found_4 else '0'})"
         
-        # Logic đối soát chuẩn: Ăn Tam Thủ là báo WIN luôn
         if count_3 >= 1 or gdb_val in old_tam_thu:
             hit_report["Kết quả"] = "Win 🔥"
         elif count_4 >= 1:
@@ -190,7 +190,7 @@ def process_matrix(current_digits, current_loto, gdb_val):
     st.session_state['db']['history'].insert(0, hit_report)
 
 # --- 3. GIAO DIỆN STREAMLIT ---
-st.markdown("<h1 style='text-align: center; color: #E2E8F0; font-weight: bold;'>⚡ MATRIX PRO V9.4.2</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #E2E8F0; font-weight: bold;'>⚡ MATRIX PRO V9.4.3</h1>", unsafe_allow_html=True)
 
 with st.sidebar:
     st.markdown("<h3 style='color: #94A3B8;'>💾 DỮ LIỆU CONTROL</h3>", unsafe_allow_html=True)
@@ -200,7 +200,7 @@ with st.sidebar:
         check_and_fix_db_structure()
         st.rerun()
     if st.session_state['db']['last_digits']:
-        st.download_button("💾 XUẤT FILE MA TRẬN", json.dumps(st.session_state['db']), "matrix_v942.json")
+        st.download_button("💾 XUẤT FILE MA TRẬN", json.dumps(st.session_state['db']), "matrix_v943.json")
     
     st.divider()
     st.markdown("<h3 style='color: #94A3B8;'>📸 CAMERA QUÉT ẢNH</h3>", unsafe_allow_html=True)
@@ -225,25 +225,26 @@ with st.sidebar:
     st.button("🚨 XÓA BẢNG TẠM", on_click=lambda: st.session_state.clear())
 
 # --- 4. KHU VỰC HIỂN THỊ CHÍNH ---
-c1, c2 = st.columns([1.4, 2.1])
+c1, c2 = st.columns([1.5, 2.0])
 
 with c1:
-    st.markdown("<h2 class='section-header'>🎯 TỌA ĐỘ PHÁT LỰC</h2>", unsafe_allow_html=True)
+    # TIÊU ĐỀ ĐỎ IN ĐẬM THEO YÊU CẦU
+    st.markdown("<h2 class='section-header-red'>🎯 TỌA ĐỘ PHÁT LỰC</h2>", unsafe_allow_html=True)
     c4 = st.session_state['db'].get('core_four', [])
     
     if c4:
-        # Khung Tam Thủ: Số màu Đỏ, in đậm, phóng to 85px chiếm gần hết nền đen
+        # Khung Tam Thủ: Số màu Đỏ, in đậm, phóng to hẳn 110px tràn viền
         st.markdown(f"""
             <div class="result-box-3">
-                <p style="color: #94A3B8; font-size: 13px; font-weight: bold; margin-bottom: 5px;">🔥 TAM THỦ CHỦ LỰC (MÀU ĐỎ)</p>
+                <p style="color: #94A3B8; font-size: 13px; font-weight: bold; margin-bottom: 2px;">🔥 TAM THỦ CHỦ LỰC</p>
                 <p class="big-text-3">{' - '.join(c4[:3])}</p>
             </div>
             """, unsafe_allow_html=True)
 
-        # Khung Tứ Thủ: Số màu Vàng, in đậm, phóng to 80px chiếm gần hết nền đen
+        # Khung Tứ Thủ: Số màu Vàng, in đậm, phóng to hẳn 100px tràn viền
         st.markdown(f"""
             <div class="result-box-4">
-                <p style="color: #94A3B8; font-size: 13px; font-weight: bold; margin-bottom: 5px;">🎯 TỨ THỦ CHIẾN THUẬT (MÀU VÀNG)</p>
+                <p style="color: #94A3B8; font-size: 13px; font-weight: bold; margin-bottom: 2px;">🎯 TỨ THỦ CHIẾN THUẬT</p>
                 <p class="big-text-4">{' - '.join(c4)}</p>
             </div>
             """, unsafe_allow_html=True)
@@ -258,7 +259,8 @@ with c1:
         st.write(f"**Lô Gan (>12 ngày):** {', '.join(gan_list) if gan_list else 'Trống'}")
         st.write(f"**Lô Bệt (>=2 ngày):** {', '.join(bet_list) if bet_list else 'Trống'}")
 
-    st.markdown("<h2 class='section-header'>📊 ĐIỂM SỐ SỢI DÂY</h2>", unsafe_allow_html=True)
+    # TIÊU ĐỀ ĐỎ IN ĐẬM THEO YÊU CẦU
+    st.markdown("<h2 class='section-header-red'>📊 ĐIỂM SỐ SỢI DÂY</h2>", unsafe_allow_html=True)
     preds = st.session_state['db'].get('last_predictions', {})
     if preds:
         sorted_keys = sorted([int(k) for k in preds.keys()], reverse=True)
@@ -268,7 +270,8 @@ with c1:
                 st.code(", ".join(data['nums']))
 
 with c2:
-    st.markdown("<h2 class='section-header'>📋 BẢNG THỐNG KÊ LỊCH SỬ ĐỐI SOÁT</h2>", unsafe_allow_html=True)
+    # TIÊU ĐỀ ĐỎ IN ĐẬM THEO YÊU CẦU
+    st.markdown("<h2 class='section-header-red'>📋 BẢNG THỐNG KÊ LỊCH SỬ ĐỐI SOÁT</h2>", unsafe_allow_html=True)
     if st.session_state['db']['history']:
         df_hist = pd.DataFrame(st.session_state['db']['history']).fillna("0")
         cols = list(df_hist.columns)
