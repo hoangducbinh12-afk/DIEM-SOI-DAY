@@ -6,7 +6,7 @@ import easyocr
 from PIL import Image
 
 # --- 1. CẤU HÌNH HỆ THỐNG MÀN HÌNH ---
-st.set_page_config(page_title="Matrix V13.5 - SDI Dual Track", layout="wide")
+st.set_page_config(page_title="Matrix V13.6 - SDI Fixed", layout="wide")
 TOTAL_POS = 107 
 
 # Custom CSS chuẩn Mobile: Tiêu đề dòng TO/ĐẬM - Số THU NHỎ vừa vặn, sang trọng
@@ -153,11 +153,11 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
     over_1d_arr = np.array(db["over_1d_matrix"], dtype=int)
     cang_lo_arr = np.array(db["cang_lo_matrix"], dtype=int)
     
-    # --- ĐỐI SOÁT LỊCH SỬ KỲ TRƯỚC PHÂN TẦNG MỚI (BỔ SUNG CỘT SONG THỦ) ---
+    # --- ĐỐI SOÁT LỊCH SỬ KỲ TRƯỚC PHÂN TẦNG ---
     hit_report = {"STT": len(db['history']) + 1, "GĐB": gdb_val, "Bạch Thủ": old_bt if old_bt else "Trống"}
     current_3c_real = [s[-3:] for s in raw_full_list if len(s) >= 3]
     
-    # 1. Đối soát cột Song Thủ SDI tự động độc lập
+    # 1. Đối soát Song Thủ độc lập
     if old_st and " - " in old_st:
         st_list = [n.strip() for n in old_st.split("-")]
         found_st = [n for n in st_list if n in current_loto]
@@ -166,7 +166,7 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
     else:
         hit_report["Song Thủ"] = "Trống"
         
-    # 2. Đối soát cột 3 càng tự động
+    # 2. Đối soát 3 Càng tự động
     win_3c_flag = False
     if old_l3c:
         predicted_3c_nums = []
@@ -179,7 +179,7 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
                 break
     hit_report["3 Càng"] = "👑 Win3Cang" if win_3c_flag else "❌"
     
-    # 3. Đối soát dàn loto 2 số tổng quát
+    # 3. Đối soát dàn 2 số tổng quát
     if old_core_4:
         old_tam_thu = old_core_4[:3]
         found_3 = [n for n in old_tam_thu if n in current_loto]
@@ -216,6 +216,20 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
                     if old_scores[i][j] >= 1: break_arr[i][j] += 1
                     new_wire_scores[i][j] = 0
 
+    # 🛠️ VÁ LỖI CHÍ MẠNG: Khởi tạo biến new_preds rỗng để tránh NameError vĩnh viễn
+    new_preds = {}
+    max_s = int(new_wire_scores.max())
+    if max_s > 0:
+        for s in range(1, max_s + 1):
+            coords = np.argwhere(new_wire_scores == s)
+            if len(coords) == 0: continue
+            level_map = {}
+            for r, c in coords:
+                num = current_digits[r] + current_digits[c]
+                level_map[num] = level_map.get(num, 0) + 1
+            isolated = [n for n, count in level_map.items() if count == 1]
+            new_preds[int(s)] = {"nums": sorted(isolated), "total_wires": int(len(coords))}
+
     db['wire_scores'] = new_wire_scores.tolist()
     db['break_matrix'] = break_arr.tolist()
     db['max_reached_matrix'] = max_reached_arr.tolist()
@@ -223,12 +237,13 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
     db['cang_lo_matrix'] = cang_lo_arr.tolist()
     db['last_digits'] = current_digits
     db['last_loto'] = current_loto
+    db['last_predictions'] = new_preds
     
     # Bốc dàn 4 con chuẩn gốc V9.4.7
     calculated_4 = get_filtered_power_score_4(new_wire_scores, current_digits)
     db['core_four'] = calculated_4
     
-    # --- 🧠 THUẬT TOÁN ĐỘNG LƯỢNG CHUỖI SDI AI ĐỘC LẬP ---
+    # --- 🧠 THUẬT TOÁN ĐỘNG LƯỢNG CHUỖI SDI AI ĐỘC LẬP VÒNG NGOÀI ---
     total_history_count = len(db['history'])
     sdi_map = {str(i).zfill(2): 1.0 for i in range(100)}
     
@@ -323,11 +338,10 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
         db['song_thu'] = ""
         db['loto_3c'] = []
         
-    db['last_predictions'] = new_preds
     db['history'].insert(0, hit_report)
 
-# --- 4. GIAO DIỆN CHÍNH STREAMLIT MOBILE V13.5 ---
-st.markdown("<h2 style='text-align: center; color: #E2E8F0; font-weight: bold; font-size: 1.5rem;'>⚡ MATRIX MASTER V13.5</h2>", unsafe_allow_html=True)
+# --- 4. GIAO DIỆN CHÍNH STREAMLIT MOBILE V13.6 ---
+st.markdown("<h2 style='text-align: center; color: #E2E8F0; font-weight: bold; font-size: 1.5rem;'>⚡ MATRIX MASTER V13.6</h2>", unsafe_allow_html=True)
 
 with st.sidebar:
     st.markdown("### 💾 DATA SYSTEM")
@@ -337,7 +351,7 @@ with st.sidebar:
         check_and_fix_db_structure()
         st.rerun()
     if st.session_state['db']['last_digits']:
-        st.download_button("💾 XUẤT FILE JSON", json.dumps(st.session_state['db']), "matrix_v135.json")
+        st.download_button("💾 XUẤT FILE JSON", json.dumps(st.session_state['db']), "matrix_v136.json")
     
     st.divider()
     st.markdown("### 📸 OCR CAMERA")
@@ -400,7 +414,7 @@ with st.expander("🚫 Hệ thống chặn số tự động"):
     st.write(f"**Lô Gan (>12 ngày):** {', '.join(gan_list) if gan_list else 'Trống'}")
     st.write(f"**Lô Bệt (>=2 ngày):** {', '.join(bet_list) if bet_list else 'Trống'}")
 
-# --- BẢNG LỊCH SỬ ĐỐI SOÁT WIN/LOSS NÂNG CẤP HAI TRỤC SONG THỦ ---
+# --- BẢNG LỊCH SỬ ĐỐI SOÁT WIN/LOSS HAI TRỤC ---
 st.markdown("<h3><font color='#FF1E27'><b>📋 LỊCH SỬ ĐỐI SOÁT KẾT QUẢ</b></font></h3>", unsafe_allow_html=True)
 st.markdown("<hr style='border: 1px solid #FF1E27; margin-top: -5px; margin-bottom: 15px;'>", unsafe_allow_html=True)
 
