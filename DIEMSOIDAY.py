@@ -5,8 +5,8 @@ import numpy as np
 import easyocr
 from PIL import Image
 
-# --- 1. CẤU HÌNH HỆ THỐNG MÀN HÌNH MỚI ---
-st.set_page_config(page_title="Matrix V13.0 - SDI Evolution", layout="wide")
+# --- 1. CẤU HÌNH HỆ THỐNG MÀN HÌNH ---
+st.set_page_config(page_title="Matrix V13.5 - SDI Dual Track", layout="wide")
 TOTAL_POS = 107 
 
 # Custom CSS chuẩn Mobile: Tiêu đề dòng TO/ĐẬM - Số THU NHỎ vừa vặn, sang trọng
@@ -49,7 +49,7 @@ if 'db' not in st.session_state:
         "last_predictions": {},
         "core_four": [],
         "bach_thu": "",
-        "song_thu": "", # Lưu trữ cặp song thủ SDI
+        "song_thu": "", 
         "loto_3c": [], 
         "gan_tracker": {str(i).zfill(2): 0 for i in range(100)},
         "bet_tracker": {str(i).zfill(2): 0 for i in range(100)},
@@ -83,7 +83,7 @@ def update_statistics(current_loto):
             db['gan_tracker'][num] += 1
             db['bet_tracker'][num] = 0
 
-# --- GIỮ NGUYÊN 100% KHUNG RA DÀN GỐC AN TOÀN V9.4.7 ---
+# --- GIỮ NGUYÊN 100% THUẬT TOÁN RA DÀN GỐC V9.4.7 ---
 def get_filtered_power_score_4(new_wire_scores, current_digits):
     check_and_fix_db_structure()
     db = st.session_state['db']
@@ -153,11 +153,20 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
     over_1d_arr = np.array(db["over_1d_matrix"], dtype=int)
     cang_lo_arr = np.array(db["cang_lo_matrix"], dtype=int)
     
-    # --- ĐỐI SOÁT LỊCH SỬ PHÂN TẦNG ---
+    # --- ĐỐI SOÁT LỊCH SỬ KỲ TRƯỚC PHÂN TẦNG MỚI (BỔ SUNG CỘT SONG THỦ) ---
     hit_report = {"STT": len(db['history']) + 1, "GĐB": gdb_val, "Bạch Thủ": old_bt if old_bt else "Trống"}
     current_3c_real = [s[-3:] for s in raw_full_list if len(s) >= 3]
     
-    # Đối soát 3 càng tự động
+    # 1. Đối soát cột Song Thủ SDI tự động độc lập
+    if old_st and " - " in old_st:
+        st_list = [n.strip() for n in old_st.split("-")]
+        found_st = [n for n in st_list if n in current_loto]
+        count_st = sum([current_loto.count(n) for n in found_st])
+        hit_report["Song Thủ"] = f"🎯 Win ST ({count_st}nh)" if count_st >= 1 else "❌"
+    else:
+        hit_report["Song Thủ"] = "Trống"
+        
+    # 2. Đối soát cột 3 càng tự động
     win_3c_flag = False
     if old_l3c:
         predicted_3c_nums = []
@@ -170,6 +179,7 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
                 break
     hit_report["3 Càng"] = "👑 Win3Cang" if win_3c_flag else "❌"
     
+    # 3. Đối soát dàn loto 2 số tổng quát
     if old_core_4:
         old_tam_thu = old_core_4[:3]
         found_3 = [n for n in old_tam_thu if n in current_loto]
@@ -185,7 +195,7 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
         elif count_4 >= 1: hit_report["Result"] = "✅ Ăn Lót"
         else: hit_report["Result"] = "❌ Loss"
 
-    # Tích lũy ma trận bộ nhớ Càng - Lô bia đá ẩn
+    # Tích lũy ma trận bộ nhớ Càng - Lô vĩnh viễn
     for single_s in raw_full_list:
         if len(single_s) >= 3:
             real_cang = int(single_s[-3])
@@ -214,23 +224,20 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
     db['last_digits'] = current_digits
     db['last_loto'] = current_loto
     
-    # Bốc dàn 4 con chuẩn gốc V9.4.7 (AI không chạm tay vào đây)
+    # Bốc dàn 4 con chuẩn gốc V9.4.7
     calculated_4 = get_filtered_power_score_4(new_wire_scores, current_digits)
     db['core_four'] = calculated_4
     
-    # --- 🧠 NÃO AI PHÂN TÍCH CHỈ SỐ SDI NÂNG CAO ĐỘC LẬP KẸP SƯỜN ---
+    # --- 🧠 THUẬT TOÁN ĐỘNG LƯỢNG CHUỖI SDI AI ĐỘC LẬP ---
     total_history_count = len(db['history'])
-    sdi_map = {str(i).zfill(2): 1.0 for i in range(100)} # Mặc định SDI phẳng bằng 1.0
+    sdi_map = {str(i).zfill(2): 1.0 for i in range(100)}
     
     if total_history_count >= 4:
-        # Trích xuất chuỗi bộ ba (X_t-1, X_t-2, X_t-3) gần nhất ngoài đời từ GĐB thô
-        # Để đơn giản và bám sát nhịp quay thô vị trí, ta lấy 2 số cuối giải ĐB của 3 kỳ gần nhất làm bộ khóa
         try:
             hist_gdb_1 = str(db['history'][0]['GĐB'])[-2:]
             hist_gdb_2 = str(db['history'][1]['GĐB'])[-2:]
             hist_gdb_3 = str(db['history'][2]['GĐB'])[-2:]
             
-            # Quét ngược toàn bộ kho lịch sử để tính xác suất điều kiện (Tử số SDI)
             chain_match_counts = {str(i).zfill(2): 0 for i in range(100)}
             total_chain_occurrences = 0
             
@@ -248,17 +255,13 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
             if total_chain_occurrences > 0:
                 for idx_s in range(100):
                     num_str = str(idx_s).zfill(2)
-                    # Tử số: Xác suất điều kiện chuỗi xuất hiện
                     p_conditional = chain_match_counts[num_str] / total_chain_occurrences
-                    # Mẫu số: Xác suất nền đại trà
                     p_base = max(1, db['total_hits'][num_str]) / max(1, sum(db['total_hits'].values()))
-                    
                     if p_base > 0 and p_conditional > 0:
                         sdi_map[num_str] = round(p_conditional / p_base, 2)
         except:
             pass
 
-    # Phân bổ tính điểm AI cho dàn Tam Thủ dựa trên hệ SDI mới
     tam_thu = calculated_4[:3]
     if tam_thu:
         mapping_1d = {str(i).zfill(2): 0 for i in range(100)}
@@ -271,11 +274,8 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
         temp_3c_list = []
         
         for num in tam_thu:
-            # Chấm điểm chọn Bạch Thủ
             score_ai = 100
-            if num == top_leader_num: score_ai += 50.0 # Thưởng +50đ độc tôn Top 1 điểm gộc
-                
-            # Cộng thêm trọng số vàng từ chỉ số phụ thuộc chuỗi SDI của con số đó
+            if num == top_leader_num: score_ai += 50.0
             score_ai += sdi_map[num] * 15.0 
             
             wire_coordinates = []
@@ -289,13 +289,11 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
             
             if 5 <= mapping_1d.get(num, 0) <= 15: score_ai += 30
             elif mapping_1d.get(num, 0) > 30: score_ai -= 25
-            
             if db['bet_tracker'][num] == 0: score_ai += 20
-            elif db['bet_tracker'][num] == 1: score_ai += 25.0 # Bẫy chặn nhịp bệt phong độ
-            
+            elif db['bet_tracker'][num] == 1: score_ai += 25.0
             bt_scores[num] = score_ai
             
-            # TOÁN HỌC TÌM CÀNG AI TWIN SHIELD TRA CỨU BIA ĐÁ
+            # Tra cứu ma trận bộ nhớ Càng-Lô Twin Shield
             idx_num = int(num)
             cang_scores_ai = {str(k): 0.0 for k in range(10)}
             for c_idx in range(10):
@@ -307,15 +305,14 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
                         
             sorted_càng = sorted(cang_scores_ai.items(), key=lambda x: x[1], reverse=True)
             càng_1 = sorted_càng[0][0]
-            càng_2 = str((int(càng_1) + 5) % 10) # Thiết lập màn bảo hiểm bóng âm dương chống bẻ lái GĐB
+            càng_2 = str((int(càng_1) + 5) % 10)
             temp_3c_list.append(f"{càng_1}{num} - {càng_2}{num}")
             
         db['bach_thu'] = max(bt_scores, key=bt_scores.get)
         db['loto_3c'] = temp_3c_list
         
-        # Bốc cặp SONG THỦ ĐỘNG LƯỢNG SDI mạnh nhất toàn bảng
+        # Trích xuất cặp Song Thủ SDI mạnh nhất toàn cục an toàn
         sorted_sdi_global = sorted(sdi_map.items(), key=lambda x: x[1], reverse=True)
-        # Lọc né các con dính gan nặng ngoài đời để song thủ an toàn
         valid_st_candidates = [item[0] for item in sorted_sdi_global if db['gan_tracker'][item[0]] <= 12]
         if len(valid_st_candidates) >= 2:
             db['song_thu'] = f"{valid_st_candidates[0]} - {valid_st_candidates[1]}"
@@ -326,9 +323,12 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
         db['song_thu'] = ""
         db['loto_3c'] = []
         
+    db['last_predictions'] = new_preds
     db['history'].insert(0, hit_report)
 
-# --- 4. GIAO DIỆN CHÍNH STREAMLIT MOBILE CHUẨN V13.0 ---
+# --- 4. GIAO DIỆN CHÍNH STREAMLIT MOBILE V13.5 ---
+st.markdown("<h2 style='text-align: center; color: #E2E8F0; font-weight: bold; font-size: 1.5rem;'>⚡ MATRIX MASTER V13.5</h2>", unsafe_allow_html=True)
+
 with st.sidebar:
     st.markdown("### 💾 DATA SYSTEM")
     uploaded_file = st.file_uploader("Nạp JSON", type=['json'])
@@ -337,7 +337,7 @@ with st.sidebar:
         check_and_fix_db_structure()
         st.rerun()
     if st.session_state['db']['last_digits']:
-        st.download_button("💾 XUẤT FILE JSON", json.dumps(st.session_state['db']), "matrix_v130.json")
+        st.download_button("💾 XUẤT FILE JSON", json.dumps(st.session_state['db']), "matrix_v135.json")
     
     st.divider()
     st.markdown("### 📸 OCR CAMERA")
@@ -361,7 +361,7 @@ with st.sidebar:
             st.rerun()
     st.button("🚨 XÓA BẢNG TẠM", on_click=lambda: st.session_state.clear())
 
-# --- HIỂN THỊ KẾT QUẢ DỰ BÁO ---
+# --- BẢNG DỰ ĐOÁN KỲ TIẾP THEO ---
 st.markdown("<h3><font color='#FF1E27'><b>🎯 TỌA ĐỘ PHÁT LỰC</b></font></h3>", unsafe_allow_html=True)
 st.markdown("<hr style='border: 1px solid #FF1E27; margin-top: -5px; margin-bottom: 15px;'>", unsafe_allow_html=True)
 
@@ -371,19 +371,12 @@ st_sdi = st.session_state['db'].get('song_thu', "")
 l3c = st.session_state['db'].get('loto_3c', [])
 
 if c4:
-    # 1. Hộp Bạch Thủ AI Master
     if bt:
         st.markdown(f"""<div class="mobile-box-bt"><span class="title-text-bt">👑 BẠCH THỦ ASSASSIN AI</span><br><p class="mobile-text-bt"><b>{bt}</b></p></div>""", unsafe_allow_html=True)
-    
-    # 2. Hộp Song Thủ Động Lượng SDI Mới Coóng
     if st_sdi:
         st.markdown(f"""<div class="mobile-box-st"><span class="title-text-st">⚔️ SONG THỦ ĐỘNG LỰC SDI</span><br><p class="mobile-text-st"><b>{st_sdi}</b></p></div>""", unsafe_allow_html=True)
-
-    # 3. Hộp Tam Thủ Chủ Lực Gốc V9.4.7 (Bảo đảm an toàn không lệch dòng tiền)
     tam_thu_str = ' - '.join(c4[:3])
     st.markdown(f"""<div class="mobile-box-3"><span class="title-text-3">🔥 TAM THỦ CHỦ LỰC GỐC</span><br><p class="mobile-text-3"><b>{tam_thu_str}</b></p></div>""", unsafe_allow_html=True)
-    
-    # 4. Hộp 3 Càng Bộ Nhớ Tra Cứu Khóa Chết Cố Định
     if l3c and len(l3c) == 3:
         st.markdown(f"""
             <div class="mobile-box-3c">
@@ -395,8 +388,6 @@ if c4:
                 </p>
             </div>
             """, unsafe_allow_html=True)
-            
-    # 5. Hộp Tứ Thủ Chiến Thuật
     tu_thu_str = ' - '.join(c4)
     st.markdown(f"""<div class="mobile-box-4"><span class="title-text-4">🎯 TỨ THỦ CHIẾN THUẬT</span><br><p class="mobile-text-4"><b>{tu_thu_str}</b></p></div>""", unsafe_allow_html=True)
 else:
@@ -409,14 +400,14 @@ with st.expander("🚫 Hệ thống chặn số tự động"):
     st.write(f"**Lô Gan (>12 ngày):** {', '.join(gan_list) if gan_list else 'Trống'}")
     st.write(f"**Lô Bệt (>=2 ngày):** {', '.join(bet_list) if bet_list else 'Trống'}")
 
-# --- BẢNG LỊCH SỬ ĐỐI SOÁT ---
+# --- BẢNG LỊCH SỬ ĐỐI SOÁT WIN/LOSS NÂNG CẤP HAI TRỤC SONG THỦ ---
 st.markdown("<h3><font color='#FF1E27'><b>📋 LỊCH SỬ ĐỐI SOÁT KẾT QUẢ</b></font></h3>", unsafe_allow_html=True)
 st.markdown("<hr style='border: 1px solid #FF1E27; margin-top: -5px; margin-bottom: 15px;'>", unsafe_allow_html=True)
 
 if st.session_state['db']['history']:
     df_hist = pd.DataFrame(st.session_state['db']['history']).fillna("0")
     cols = list(df_hist.columns)
-    important = ["Result", "Bạch Thủ", "3 Càng", "Dàn 3q", "Dàn 4q", "GĐB", "STT"]
+    important = ["Result", "Bạch Thủ", "Song Thủ", "3 Càng", "Dàn 3q", "Dàn 4q", "GĐB", "STT"]
     for col in reversed(important):
         if col in cols: cols.insert(0, cols.pop(cols.index(col)))
     
@@ -429,10 +420,13 @@ if st.session_state['db']['history']:
                           ('color: #718096' if x == "❌ Loss" else ''))),
                 subset=["Result"]
             ).map(
+                lambda x: 'color: #A855F7; font-weight: 900' if "🎯 Win ST" in str(x) else 'color: #4A5568',
+                subset=["Song Thủ"]
+            ).map(
                 lambda x: 'color: #10B981; font-weight: 900' if x == "👑 Win3Cang" else 'color: #4A5568',
                 subset=["3 Càng"]
             ),
             use_container_width=True, height=550
         )
 else:
-    st.dataframe(pd.DataFrame(columns=["Result", "Bạch Thủ", "3 Càng", "Dàn 3q", "Dàn 4q", "GĐB", "STT"]), use_container_width=True, height=150)
+    st.dataframe(pd.DataFrame(columns=["Result", "Bạch Thủ", "Song Thủ", "3 Càng", "Dàn 3q", "Dàn 4q", "GĐB", "STT"]), use_container_width=True, height=150)
