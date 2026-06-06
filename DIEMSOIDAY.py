@@ -6,10 +6,9 @@ import easyocr
 from PIL import Image
 
 # --- 1. CẤU HÌNH HỆ THỐNG MÀN HÌNH ---
-st.set_page_config(page_title="Matrix V13.6 - SDI Fixed", layout="wide")
+st.set_page_config(page_title="Matrix V13.8 - SDI Reborn", layout="wide")
 TOTAL_POS = 107 
 
-# Custom CSS chuẩn Mobile: Tiêu đề dòng TO/ĐẬM - Số THU NHỎ vừa vặn, sang trọng
 st.markdown("""
     <style>
     .main { background-color: #0A0D14; padding: 10px; }
@@ -153,11 +152,10 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
     over_1d_arr = np.array(db["over_1d_matrix"], dtype=int)
     cang_lo_arr = np.array(db["cang_lo_matrix"], dtype=int)
     
-    # --- ĐỐI SOÁT LỊCH SỬ KỲ TRƯỚC PHÂN TẦNG ---
+    # --- ĐỐI SOÁT LỊCH SỬ KỲ TRƯỚC ---
     hit_report = {"STT": len(db['history']) + 1, "GĐB": gdb_val, "Bạch Thủ": old_bt if old_bt else "Trống"}
     current_3c_real = [s[-3:] for s in raw_full_list if len(s) >= 3]
     
-    # 1. Đối soát Song Thủ độc lập
     if old_st and " - " in old_st:
         st_list = [n.strip() for n in old_st.split("-")]
         found_st = [n for n in st_list if n in current_loto]
@@ -166,7 +164,6 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
     else:
         hit_report["Song Thủ"] = "Trống"
         
-    # 2. Đối soát 3 Càng tự động
     win_3c_flag = False
     if old_l3c:
         predicted_3c_nums = []
@@ -179,7 +176,6 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
                 break
     hit_report["3 Càng"] = "👑 Win3Cang" if win_3c_flag else "❌"
     
-    # 3. Đối soát dàn 2 số tổng quát
     if old_core_4:
         old_tam_thu = old_core_4[:3]
         found_3 = [n for n in old_tam_thu if n in current_loto]
@@ -195,7 +191,6 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
         elif count_4 >= 1: hit_report["Result"] = "✅ Ăn Lót"
         else: hit_report["Result"] = "❌ Loss"
 
-    # Tích lũy ma trận bộ nhớ Càng - Lô vĩnh viễn
     for single_s in raw_full_list:
         if len(single_s) >= 3:
             real_cang = int(single_s[-3])
@@ -216,7 +211,6 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
                     if old_scores[i][j] >= 1: break_arr[i][j] += 1
                     new_wire_scores[i][j] = 0
 
-    # 🛠️ VÁ LỖI CHÍ MẠNG: Khởi tạo biến new_preds rỗng để tránh NameError vĩnh viễn
     new_preds = {}
     max_s = int(new_wire_scores.max())
     if max_s > 0:
@@ -243,9 +237,9 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
     calculated_4 = get_filtered_power_score_4(new_wire_scores, current_digits)
     db['core_four'] = calculated_4
     
-    # --- 🧠 THUẬT TOÁN ĐỘNG LƯỢNG CHUỖI SDI AI ĐỘC LẬP VÒNG NGOÀI ---
-    total_history_count = len(db['history'])
-    sdi_map = {str(i).zfill(2): 1.0 for i in range(100)}
+    # --- 🧠 THUẬT TOÁN SDI CẢI TIẾN VÁ LỖI PHÁ BĂNG 00-01 ---
+    sdi_map = {}
+    has_real_sdi = False
     
     if total_history_count >= 4:
         try:
@@ -274,8 +268,13 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
                     p_base = max(1, db['total_hits'][num_str]) / max(1, sum(db['total_hits'].values()))
                     if p_base > 0 and p_conditional > 0:
                         sdi_map[num_str] = round(p_conditional / p_base, 2)
+                        has_real_sdi = True
         except:
             pass
+
+    # Nếu không có dữ liệu chuỗi SDI, gán tất cả bằng 0.0 thay vì 1.0 để nhận diện
+    if not has_real_sdi:
+        sdi_map = {str(i).zfill(2): 0.0 for i in range(100)}
 
     tam_thu = calculated_4[:3]
     if tam_thu:
@@ -291,7 +290,7 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
         for num in tam_thu:
             score_ai = 100
             if num == top_leader_num: score_ai += 50.0
-            score_ai += sdi_map[num] * 15.0 
+            score_ai += sdi_map.get(num, 0.0) * 15.0 
             
             wire_coordinates = []
             for r in range(TOTAL_POS):
@@ -308,7 +307,7 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
             elif db['bet_tracker'][num] == 1: score_ai += 25.0
             bt_scores[num] = score_ai
             
-            # Tra cứu ma trận bộ nhớ Càng-Lô Twin Shield
+            # Càng Twin Shield
             idx_num = int(num)
             cang_scores_ai = {str(k): 0.0 for k in range(10)}
             for c_idx in range(10):
@@ -318,7 +317,7 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
                     if 0 <= adj < TOTAL_POS:
                         cang_scores_ai[current_digits[adj]] += 5.0
                         
-            sorted_càng = sorted(cang_scores_ai.items(), key=lambda x: x[1], reverse=True)
+            sorted_càng = sorted(càng_scores_ai.items(), key=lambda x: x[1], reverse=True)
             càng_1 = sorted_càng[0][0]
             càng_2 = str((int(càng_1) + 5) % 10)
             temp_3c_list.append(f"{càng_1}{num} - {càng_2}{num}")
@@ -326,13 +325,14 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
         db['bach_thu'] = max(bt_scores, key=bt_scores.get)
         db['loto_3c'] = temp_3c_list
         
-        # Trích xuất cặp Song Thủ SDI mạnh nhất toàn cục an toàn
-        sorted_sdi_global = sorted(sdi_map.items(), key=lambda x: x[1], reverse=True)
-        valid_st_candidates = [item[0] for item in sorted_sdi_global if db['gan_tracker'][item[0]] <= 12]
-        if len(valid_st_candidates) >= 2:
+        # 🛠️ CƠ CHẾ KHÓA CHẶN FALLBACK CHO SONG THỦ: PHÁ TAN BĂNG 00-01
+        if has_real_sdi:
+            sorted_sdi_global = sorted(sdi_map.items(), key=lambda x: x[1], reverse=True)
+            valid_st_candidates = [item[0] for item in sorted_sdi_global if db['gan_tracker'][item[0]] <= 12]
             db['song_thu'] = f"{valid_st_candidates[0]} - {valid_st_candidates[1]}"
         else:
-            db['song_thu'] = " - ".join(calculated_4[:2])
+            # Nếu chưa đủ dữ liệu chuỗi SDI, lấy thẳng con nhiều điểm thứ 1 và thứ 2 của dàn gốc V9.4.7 làm Song Thủ
+            db['song_thu'] = f"{calculated_4[0]} - {calculated_4[1]}"
     else:
         db['bach_thu'] = ""
         db['song_thu'] = ""
@@ -340,8 +340,8 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
         
     db['history'].insert(0, hit_report)
 
-# --- 4. GIAO DIỆN CHÍNH STREAMLIT MOBILE V13.6 ---
-st.markdown("<h2 style='text-align: center; color: #E2E8F0; font-weight: bold; font-size: 1.5rem;'>⚡ MATRIX MASTER V13.6</h2>", unsafe_allow_html=True)
+# --- 4. GIAO DIỆN CHÍNH STREAMLIT MOBILE V13.8 ---
+st.markdown("<h2 style='text-align: center; color: #E2E8F0; font-weight: bold; font-size: 1.5rem;'>⚡ MATRIX MASTER V13.8</h2>", unsafe_allow_html=True)
 
 with st.sidebar:
     st.markdown("### 💾 DATA SYSTEM")
@@ -351,7 +351,7 @@ with st.sidebar:
         check_and_fix_db_structure()
         st.rerun()
     if st.session_state['db']['last_digits']:
-        st.download_button("💾 XUẤT FILE JSON", json.dumps(st.session_state['db']), "matrix_v136.json")
+        st.download_button("💾 XUẤT FILE JSON", json.dumps(st.session_state['db']), "matrix_v138.json")
     
     st.divider()
     st.markdown("### 📸 OCR CAMERA")
@@ -375,7 +375,7 @@ with st.sidebar:
             st.rerun()
     st.button("🚨 XÓA BẢNG TẠM", on_click=lambda: st.session_state.clear())
 
-# --- BẢNG DỰ ĐOÁN KỲ TIẾP THEO ---
+# --- BẢNG DỰ ĐOÁN ---
 st.markdown("<h3><font color='#FF1E27'><b>🎯 TỌA ĐỘ PHÁT LỰC</b></font></h3>", unsafe_allow_html=True)
 st.markdown("<hr style='border: 1px solid #FF1E27; margin-top: -5px; margin-bottom: 15px;'>", unsafe_allow_html=True)
 
@@ -414,7 +414,7 @@ with st.expander("🚫 Hệ thống chặn số tự động"):
     st.write(f"**Lô Gan (>12 ngày):** {', '.join(gan_list) if gan_list else 'Trống'}")
     st.write(f"**Lô Bệt (>=2 ngày):** {', '.join(bet_list) if bet_list else 'Trống'}")
 
-# --- BẢNG LỊCH SỬ ĐỐI SOÁT WIN/LOSS HAI TRỤC ---
+# --- BẢNG LỊCH SỬ ---
 st.markdown("<h3><font color='#FF1E27'><b>📋 LỊCH SỬ ĐỐI SOÁT KẾT QUẢ</b></font></h3>", unsafe_allow_html=True)
 st.markdown("<hr style='border: 1px solid #FF1E27; margin-top: -5px; margin-bottom: 15px;'>", unsafe_allow_html=True)
 
