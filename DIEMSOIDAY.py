@@ -6,7 +6,7 @@ import easyocr
 from PIL import Image
 
 # --- 1. CẤU HÌNH HỆ THỐNG MÀN HÌNH ---
-st.set_page_config(page_title="Matrix V14.0 - Ultimate Shield", layout="wide")
+st.set_page_config(page_title="Matrix V15.0 - ST 3-Càng Sniper", layout="wide")
 TOTAL_POS = 107 
 
 # Custom CSS chuẩn Mobile: Tiêu đề dòng TO/ĐẬM - Số THU NHỎ vừa vặn, sang trọng
@@ -31,7 +31,7 @@ st.markdown("""
     .mobile-text-bt { color: #FF1E27 !important; font-size: 9.5vw !important; font-weight: 900 !important; font-family: monospace; letter-spacing: 2px; margin: 0; line-height: 1.1; white-space: nowrap !important; }
     .mobile-text-st { color: #A855F7 !important; font-size: 8.0vw !important; font-weight: 900 !important; font-family: monospace; letter-spacing: 1px; margin: 0; line-height: 1.1; white-space: nowrap !important; }
     .mobile-text-3 { color: #FF1E27 !important; font-size: 7.5vw !important; font-weight: 900 !important; font-family: monospace; letter-spacing: 1px; margin: 0; line-height: 1.1; white-space: nowrap !important; }
-    .mobile-text-3c { color: #10B981 !important; font-size: 5.2vw !important; font-weight: 900 !important; font-family: monospace; letter-spacing: 1px; margin: 0; line-height: 1.2; }
+    .mobile-text-3c { color: #10B981 !important; font-size: 4.8vw !important; font-weight: 900 !important; font-family: monospace; letter-spacing: 1px; margin: 0; line-height: 1.3; }
     .mobile-text-4 { color: #FFD700 !important; font-size: 5.5vw !important; font-weight: 900 !important; font-family: monospace; letter-spacing: 1px; margin: 0; line-height: 1.1; white-space: nowrap !important; }
     </style>
     """, unsafe_allow_html=True)
@@ -83,7 +83,7 @@ def update_statistics(current_loto):
             db['gan_tracker'][num] += 1
             db['bet_tracker'][num] = 0
 
-# --- GIỮ NGUYÊN 100% THUẬT TOÁN RA DÀN GỐC V9.4.7 AN TOÀN ---
+# --- GIỮ NGUYÊN 100% THUẬT TOÁN GỐC V9.4.7 AN TOÀN TUYỆT ĐỐI ---
 def get_filtered_power_score_4(new_wire_scores, current_digits):
     check_and_fix_db_structure()
     db = st.session_state['db']
@@ -153,13 +153,13 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
     over_1d_arr = np.array(db["over_1d_matrix"], dtype=int)
     cang_lo_arr = np.array(db["cang_lo_matrix"], dtype=int)
     
-    # --- ĐỐI SOÁT LỊCH SỬ KỲ TRƯỚC ---
+    # --- ĐỐI SOÁT LỊCH SỬ KỲ TRƯỚC VÀO BẢNG ---
     hit_report = {"STT": len(db['history']) + 1, "GĐB": gdb_val, "Bạch Thủ": old_bt if old_bt else "Trống"}
     current_3c_real = [s[-3:] for s in raw_full_list if len(s) >= 3]
     
     if old_st and " - " in old_st:
-        st_list = [n.strip() for n in old_st.split("-")]
-        found_st = [n for n in st_list if n in current_loto]
+        st_list_check = [n.strip() for n in old_st.split("-")]
+        found_st = [n for n in st_list_check if n in current_loto]
         count_st = sum([current_loto.count(n) for n in found_st])
         hit_report["Song Thủ"] = f"🎯 Win ST ({count_st}nh)" if count_st >= 1 else "❌"
     else:
@@ -168,8 +168,8 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
     win_3c_flag = False
     if old_l3c:
         predicted_3c_nums = []
-        for pair in old_l3c:
-            for part in pair.split("-"):
+        for line in old_l3c:
+            for part in line.split("-"):
                 predicted_3c_nums.append(part.strip())
         for num_3c in predicted_3c_nums:
             if num_3c in current_3c_real:
@@ -226,7 +226,8 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
             new_preds[int(s)] = {"nums": sorted(isolated), "total_wires": int(len(coords))}
 
     db['wire_scores'] = new_wire_scores.tolist()
-    db['break_matrix'] = break_arr.tolist()
+    break_arr_list = break_arr.tolist()
+    db['break_matrix'] = break_arr_list
     db['max_reached_matrix'] = max_reached_arr.tolist()
     db['over_1d_matrix'] = over_1d_arr.tolist()
     db['cang_lo_matrix'] = cang_lo_arr.tolist()
@@ -238,8 +239,8 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
     calculated_4 = get_filtered_power_score_4(new_wire_scores, current_digits)
     db['core_four'] = calculated_4
     
-    # --- 🧠 ⚔️ THUẬT TOÁN SDI CẢI TIẾN VÁ LỖI PHÁ BĂNG 00-01 (ĐÃ VÁ LỖI ĐỊNH NGHĨA BIẾN) ---
-    total_history_count = len(db['history'])  # <--- SỬA LỖI: Đã khai báo biến chuẩn đét ở đây vcl!
+    # --- 🧠 THUẬT TOÁN ĐỘNG LƯỢNG CHUỖI SDI AI ĐỘC LẬP VÒNG NGOÀI ---
+    total_history_count = len(db['history'])
     sdi_map = {}
     has_real_sdi = False
     
@@ -286,21 +287,18 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
             
         bt_scores = {}
         top_leader_num = tam_thu[0]
-        temp_3c_list = []
         
+        # A. CHỐT BẠCH THỦ AI TRƯỚC
         for num in tam_thu:
             score_ai = 100
             if num == top_leader_num: score_ai += 50.0
             score_ai += sdi_map.get(num, 0.0) * 15.0 
             
-            wire_coordinates = []
             for r in range(TOTAL_POS):
                 for c in range(TOTAL_POS):
                     if current_digits[r] + current_digits[c] == num:
-                        score_ai -= break_arr[r][c] * 2.5
+                        score_ai -= break_arr_list[r][c] * 2.5
                         score_ai += over_1d_arr[r][c] * 3.5
-                        if int(new_wire_scores[r][c]) >= 2:
-                            wire_coordinates.append((r, c))
             
             if 5 <= mapping_1d.get(num, 0) <= 15: score_ai += 30
             elif mapping_1d.get(num, 0) > 30: score_ai -= 25
@@ -308,31 +306,51 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
             elif db['bet_tracker'][num] == 1: score_ai += 25.0
             bt_scores[num] = score_ai
             
-            # Càng Twin Shield
-            idx_num = int(num)
+        db['bach_thu'] = max(bt_scores, key=bt_scores.get)
+        
+        # B. CHỐT SONG THỦ TỰ ĐỘNG CHỐNG LIỆT SỐ
+        if has_real_sdi:
+            sorted_sdi_global = sorted(sdi_map.items(), key=lambda x: x[1], reverse=True)
+            valid_st_candidates = [item[0] for item in sorted_sdi_global if db['gan_tracker'][item[0]] <= 12]
+            st_list = valid_st_candidates[:2] if len(valid_st_candidates) >= 2 else calculated_4[:2]
+        else:
+            st_list = [calculated_4[0], calculated_4[1]]
+            
+        db['song_thu'] = f"{st_list[0]} - {st_list[1]}"
+        
+        # --- 🔮 CẤU HÌNH MỚI V15.0: NÃO 3 CÀNG LINH ĐỘNG TUYỆT ĐỐI THEO 2 CON SONG THỦ ---
+        temp_3c_list = []
+        for num in st_list:
+            wire_coordinates = []
+            for r in range(TOTAL_POS):
+                for c in range(TOTAL_POS):
+                    if current_digits[r] + current_digits[c] == num:
+                        if int(new_wire_scores[r][c]) >= 2:
+                            wire_coordinates.append((r, c))
+                            
             cang_scores_ai = {str(k): 0.0 for k in range(10)}
+            idx_num = int(num)
+            
+            # 1. Quét bộ nhớ bia đá ẩn tần suất Càng - Lô (Trọng số 15đ cực nặng)
             for c_idx in range(10):
                 cang_scores_ai[str(c_idx)] += float(cang_lo_arr[idx_num][c_idx]) * 15.0
+                
+            # 2. Quét kẹp trục hình học ma trận kỳ hiện tại (Trọng số 5đ bổ khuyết)
             for r_coord, c_coord in wire_coordinates:
                 for adj in [r_coord - 1, r_coord + 1, c_coord - 1, c_coord + 1]:
                     if 0 <= adj < TOTAL_POS:
                         cang_scores_ai[current_digits[adj]] += 5.0
                         
-            sorted_càng = sorted(càng_scores_ai.items(), key=lambda x: x[1], reverse=True)
+            # Sắp xếp nhặt ra TOP 3 CÀNG CÓ ĐIỂM SỐ AI LỚN NHẤT (Linh động 100%)
+            sorted_càng = sorted(cang_scores_ai.items(), key=lambda x: x[1], reverse=True)
             càng_1 = sorted_càng[0][0]
-            càng_2 = str((int(càng_1) + 5) % 10)
-            temp_3c_list.append(f"{càng_1}{num} - {càng_2}{num}")
+            càng_2 = sorted_càng[1][0]
+            càng_3 = sorted_càng[2][0]
             
-        db['bach_thu'] = max(bt_scores, key=bt_scores.get)
+            # Mỗi con Song thủ sinh ra đúng 3 con 3 càng -> Tổng cộng 6 con loto 3 số siêu nét
+            temp_3c_list.append(f"{càng_1}{num} - {càng_2}{num} - {càng_3}{num}")
+            
         db['loto_3c'] = temp_3c_list
-        
-        # CƠ CHẾ KHÓA CHẶN FALLBACK CHO SONG THỦ CỦA V13.8 CHUẨN CHỈ
-        if has_real_sdi:
-            sorted_sdi_global = sorted(sdi_map.items(), key=lambda x: x[1], reverse=True)
-            valid_st_candidates = [item[0] for item in sorted_sdi_global if db['gan_tracker'][item[0]] <= 12]
-            db['song_thu'] = f"{valid_st_candidates[0]} - {valid_st_candidates[1]}"
-        else:
-            db['song_thu'] = f"{calculated_4[0]} - {calculated_4[1]}"
     else:
         db['bach_thu'] = ""
         db['song_thu'] = ""
@@ -340,8 +358,8 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
         
     db['history'].insert(0, hit_report)
 
-# --- 4. GIAO DIỆN CHÍNH STREAMLIT MOBILE V14.0 ---
-st.markdown("<h2 style='text-align: center; color: #E2E8F0; font-weight: bold; font-size: 1.5rem;'>⚡ MATRIX MASTER V14.0</h2>", unsafe_allow_html=True)
+# --- 4. GIAO DIỆN CHÍNH STREAMLIT MOBILE V15.0 ---
+st.markdown("<h2 style='text-align: center; color: #E2E8F0; font-weight: bold; font-size: 1.5rem;'>⚡ MATRIX MASTER V15.0</h2>", unsafe_allow_html=True)
 
 with st.sidebar:
     st.markdown("### 💾 DATA SYSTEM")
@@ -351,7 +369,7 @@ with st.sidebar:
         check_and_fix_db_structure()
         st.rerun()
     if st.session_state['db']['last_digits']:
-        st.download_button("💾 XUẤT FILE JSON", json.dumps(st.session_state['db']), "matrix_v140.json")
+        st.download_button("💾 XUẤT FILE JSON", json.dumps(st.session_state['db']), "matrix_v150.json")
     
     st.divider()
     st.markdown("### 📸 OCR CAMERA")
@@ -391,17 +409,19 @@ if c4:
         st.markdown(f"""<div class="mobile-box-st"><span class="title-text-st">⚔️ SONG THỦ ĐỘNG LỰC SDI</span><br><p class="mobile-text-st"><b>{st_sdi}</b></p></div>""", unsafe_allow_html=True)
     tam_thu_str = ' - '.join(c4[:3])
     st.markdown(f"""<div class="mobile-box-3"><span class="title-text-3">🔥 TAM THỦ CHỦ LỰC GỐC</span><br><p class="mobile-text-3"><b>{tam_thu_str}</b></p></div>""", unsafe_allow_html=True)
-    if l3c and len(l3c) == 3:
+    
+    # 🔮 HIỂN THỊ DÀN LOTO 3 SỐ THEO SONG THỦ MỚI COONG
+    if l3c and len(l3c) == 2:
         st.markdown(f"""
             <div class="mobile-box-3c">
-                <span class="title-text-3c">🔮 3 CÀNG MEMORY TWIN SHIELD</span><br>
+                <span class="title-text-3c">🔮 3 CÀNG DYNAMIC SDI SNIPER</span><br>
                 <p class="mobile-text-3c">
-                    <b>Lo1: {l3c[0]}</b><br>
-                    <b>Lo2: {l3c[1]}</b><br>
-                    <b>Lo3: {l3c[2]}</b>
+                    <b>St1: {l3c[0]}</b><br>
+                    <b>St2: {l3c[1]}</b><br>
                 </p>
             </div>
             """, unsafe_allow_html=True)
+            
     tu_thu_str = ' - '.join(c4)
     st.markdown(f"""<div class="mobile-box-4"><span class="title-text-4">🎯 TỨ THỦ CHIẾN THUẬT</span><br><p class="mobile-text-4"><b>{tu_thu_str}</b></p></div>""", unsafe_allow_html=True)
 else:
