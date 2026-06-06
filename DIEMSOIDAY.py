@@ -6,7 +6,7 @@ import easyocr
 from PIL import Image
 
 # --- 1. CẤU HÌNH HỆ THỐNG MÀN HÌNH ---
-st.set_page_config(page_title="Matrix V20.0 - Combinatorial Master", layout="wide")
+st.set_page_config(page_title="Matrix V20.1 - Combinatorial Fixed", layout="wide")
 
 # Custom CSS chuẩn Mobile: Tiêu đề dòng TO/ĐẬM - Số THU NHỎ vừa vặn, sang trọng
 st.markdown("""
@@ -57,11 +57,10 @@ def process_matrix(gdb_val, raw_full_list):
     check_and_fix_db_structure()
     db = st.session_state['db']
     
-    # Chuẩn hóa tập 27 con lô thô (lấy 2 số cuối)
+    # 1. Chuẩn hóa tập 27 con lô thô (lấy 2 số cuối)
     current_loto_2s = [s[-2:] for s in raw_full_list[:27] if len(s) >= 2]
-    # Chuẩn hóa tập 23 con 3 càng tinh khiết (bỏ 4 giải 7 cuối bảng)
-    current_cang_3s = [s[-3:] for s in raw_full_list if len(s) >= 3 and raw_full_list.index(single_s) < 23] if len(raw_full_list) >= 23 else [s[-3:] for s in raw_full_list if len(s) >= 3]
-    # Sửa lỗi lấy chỉ số chuẩn xác của 23 giải đầu bảng (loại trừ giải 7 có độ dài < 3 chữ số)
+    
+    # 2. 🛠️ ĐÃ VÁ LỖI CHÍ MẠNG V20.1: Trích xuất chuẩn xác 23 giải đầu bảng bỏ giải 7 gọn gàng không lỗi biến
     current_cang_3s = [s[-3:] for s in raw_full_list if len(s) >= 3][:23]
 
     old_preds = db.get("last_predictions", {"bach_thu": "", "song_thu": "", "loto_3c": []})
@@ -72,7 +71,7 @@ def process_matrix(gdb_val, raw_full_list):
     total_history_count = len(db['history'])
     stt_kỳ = total_history_count + 1
 
-    # --- 📋 KHỐI ĐỐI SOÁT KẾT QUẢ WIN / LOSS (TỪ KỲ THỨ 4 TRỞ ĐI MỚI CHẠY) ---
+    # --- 📋 KHỐI ĐỐI SOÁT KẾT QUẢ WIN / LOSS ---
     hit_report = {"STT": stt_kỳ, "GĐB": gdb_val}
     
     if total_history_count < 3:
@@ -154,20 +153,17 @@ def process_matrix(gdb_val, raw_full_list):
             pass
 
     # --- 🎯 PHẦN AI QUÉT KHÓA TỔ HỢP ĐƯA RA DỰ ĐOÁN CHO KỲ TIẾP THEO ---
-    # Đẩy báo cáo vào lịch sử trước để làm bàn đạp cho chuỗi chuyển tiếp mới
     db['history'].insert(0, hit_report)
     updated_history_count = len(db['history'])
 
     if updated_history_count < 3:
-        # Thời kỳ khởi tạo 3 ngày đầu -> Khóa predictions
         db["last_predictions"] = {"bach_thu": "", "song_thu": "", "loto_3c": []}
     else:
-        # KÍCH HOẠT KỲ THỨ 4: Tính toán dải số động cho tương lai
         pred_2s_scores = {str(i).zfill(2): 0 for i in range(100)}
         pred_3c_scores = {}
         
         try:
-            # Tra cứu khóa tổ hợp 2 số cho tương lai dựa trên 3 ngày gần nhất (kể cả ngày vừa nạp)
+            # Tra cứu khóa tổ hợp 2 số cho tương lai dựa trên 3 ngày gần nhất
             fut_A_2s = db['history'][2].get("Saved_Loto_2S", [])
             fut_B_2s = db['history'][1].get("Saved_Loto_2S", [])
             fut_C_2s = current_loto_2s
@@ -195,33 +191,31 @@ def process_matrix(gdb_val, raw_full_list):
         except:
             pass
 
-        # 1. Nhặt Bạch Thủ (Thằng nổ nhiều nhất sau lưới tổ hợp 2 số)
+        # 1. Nhặt Bạch Thủ
         sorted_2s = sorted(pred_2s_scores.items(), key=lambda x: x[1], reverse=True)
         calculated_bt = sorted_2s[0][0] if sorted_2s[0][1] > 0 else "00"
         
-        # 2. Nhặt Song Thủ (Cặp đôi nổ bạt mạng nhiều nhất sau tổ hợp)
+        # 2. Nhặt Song Thủ
         calculated_st = f"{sorted_2s[0][0]} - {sorted_2s[1][0]}" if sorted_2s[0][1] > 0 and sorted_2s[1][1] > 0 else "00 - 01"
         
-        # 3. Nhặt TOP 6 CON 3 CÀNG ĐÍCH DANH (Quét tự do từ tổ hợp 23 giải)
+        # 3. Nhặt TOP 6 CON 3 CÀNG ĐÍCH DANH
         calculated_3c_list = []
         if pred_3c_scores:
             sorted_3c = sorted(pred_3c_scores.items(), key=lambda x: x[1], reverse=True)
             calculated_3c_list = [item[0] for item in sorted_3c[:6]]
             
-        # Nếu chưa đủ nhịp nổ trùng khớp tổ hợp, AI nhặt ngẫu biến bọc lót theo càng phổ thông
         while len(calculated_3c_list) < 6:
             mock_num = f"{len(calculated_3c_list)}{calculated_bt}"[-3:]
             calculated_3c_list.append(mock_num)
             
-        # Đồng bộ vào bộ nhớ predictions để dành đối soát cho ngày mai
         db["last_predictions"] = {
             "bach_thu": calculated_bt,
             "song_thu": calculated_st,
             "loto_3c": calculated_3c_list
         }
 
-# --- 5. GIAO DIỆN CHÍNH STREAMLIT MOBILE V20.0 ---
-st.markdown("<h2 style='text-align: center; color: #E2E8F0; font-weight: bold; font-size: 1.5rem;'>⚡ MATRIX MASTER V20.0</h2>", unsafe_allow_html=True)
+# --- 5. GIAO DIỆN CHÍNH STREAMLIT MOBILE V20.1 ---
+st.markdown("<h2 style='text-align: center; color: #E2E8F0; font-weight: bold; font-size: 1.5rem;'>⚡ MATRIX MASTER V20.1</h2>", unsafe_allow_html=True)
 
 with st.sidebar:
     st.markdown("### 💾 DATA SYSTEM")
@@ -231,7 +225,7 @@ with st.sidebar:
         check_and_fix_db_structure()
         st.rerun()
     if st.session_state['db'].get('history'):
-        st.download_button("💾 XUẤT FILE JSON", json.dumps(st.session_state['db']), "combinatorial_v200.json")
+        st.download_button("💾 XUẤT FILE JSON", json.dumps(st.session_state['db']), "combinatorial_v201.json")
     
     st.divider()
     st.markdown("### 📸 OCR CAMERA")
@@ -272,11 +266,8 @@ else:
     st_num = preds.get("song_thu", "")
     l3c_list = preds.get("loto_3c", [])
     
-    # 1. Hộp Bạch Thủ Độc Tôn 2 Số
     st.markdown(f"""<div class="mobile-box-bt"><span class="title-text-bt">👑 BẠCH THỦ ĐỘC TÔN (2 SỐ)</span><br><p class="mobile-text-bt"><b>{bt_num}</b></p></div>""", unsafe_allow_html=True)
-    # 2. Hộp Song Thủ Chiến Thuật 2 Số
     st.markdown(f"""<div class="mobile-box-st"><span class="title-text-st">⚔️ SONG THỦ CHIẾN THUẬT (2 SỐ)</span><br><p class="mobile-text-st"><b>{st_num}</b></p></div>""", unsafe_allow_html=True)
-    # 3. Hộp Dàn 6 Con 3 Càng Matrix Sniper
     if l3c_list and len(l3c_list) == 6:
         st.markdown(f"""
             <div class="mobile-box-3c">
@@ -293,7 +284,6 @@ st.markdown("<h3><font color='#FF1E27'><b>📋 LỊCH SỬ ĐỐI SOÁT KẾT QU
 st.markdown("<hr style='border: 1px solid #FF1E27; margin-top: -5px; margin-bottom: 15px;'>", unsafe_allow_html=True)
 
 if st.session_state['db']['history']:
-    # Format hiển thị loại trừ dải list lưu trữ thô ẩn để bảng sạch sẽ
     df_display = pd.DataFrame(st.session_state['db']['history'])
     display_cols = [c for c in ["Result", "Bạch Thủ", "Song Thủ", "3 Càng", "GĐB", "STT"] if c in df_display.columns]
     
