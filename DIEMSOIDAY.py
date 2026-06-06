@@ -6,7 +6,7 @@ import easyocr
 from PIL import Image
 
 # --- 1. CẤU HÌNH HỆ THỐNG MÀN HÌNH ---
-st.set_page_config(page_title="Matrix V20.1 - Combinatorial Fixed", layout="wide")
+st.set_page_config(page_title="Matrix V21.0 - Turbo Combinatorial", layout="wide")
 
 # Custom CSS chuẩn Mobile: Tiêu đề dòng TO/ĐẬM - Số THU NHỎ vừa vặn, sang trọng
 st.markdown("""
@@ -31,9 +31,9 @@ st.markdown("""
 
 if 'db' not in st.session_state:
     st.session_state['db'] = {
-        "loto_2s_memory": {},       # Ma trận tổ hợp chéo 2 số (27 x 27 x 27)
-        "cang_3s_memory": {},       # Ma trận tổ hợp chéo 3 số (23 x 23 x 23)
-        "history": [],              # Nhật ký lưu trữ đối soát kết quả
+        "loto_2s_memory": {},       # Lưu trữ thực tế dạng băm khóa chéo (27x27x27)
+        "cang_3s_memory": {},       # Lưu trữ thực tế dạng băm khóa chéo (23x23x23)
+        "history": [],              # Nhật ký đối soát
         "last_predictions": {
             "bach_thu": "",
             "song_thu": "",
@@ -57,10 +57,8 @@ def process_matrix(gdb_val, raw_full_list):
     check_and_fix_db_structure()
     db = st.session_state['db']
     
-    # 1. Chuẩn hóa tập 27 con lô thô (lấy 2 số cuối)
+    # 1. Trích xuất mảng 2 con loto (27 giải) và 3 con 3 càng (23 giải tinh khiết)
     current_loto_2s = [s[-2:] for s in raw_full_list[:27] if len(s) >= 2]
-    
-    # 2. 🛠️ ĐÃ VÁ LỖI CHÍ MẠNG V20.1: Trích xuất chuẩn xác 23 giải đầu bảng bỏ giải 7 gọn gàng không lỗi biến
     current_cang_3s = [s[-3:] for s in raw_full_list if len(s) >= 3][:23]
 
     old_preds = db.get("last_predictions", {"bach_thu": "", "song_thu": "", "loto_3c": []})
@@ -71,7 +69,7 @@ def process_matrix(gdb_val, raw_full_list):
     total_history_count = len(db['history'])
     stt_kỳ = total_history_count + 1
 
-    # --- 📋 KHỐI ĐỐI SOÁT KẾT QUẢ WIN / LOSS ---
+    # --- 📋 KHỐI ĐỐI SOÁT WIN/LOSS SẠCH SẼ ---
     hit_report = {"STT": stt_kỳ, "GĐB": gdb_val}
     
     if total_history_count < 3:
@@ -81,46 +79,31 @@ def process_matrix(gdb_val, raw_full_list):
         hit_report["Result"] = "⚙️ Khởi tạo"
     else:
         # Đối soát Bạch Thủ
-        hit_report["Bạch Thủ"] = f"{old_bt} (❌)" if old_bt else "Trống"
-        if old_bt and old_bt in current_loto_2s:
-            hit_report["Bạch Thủ"] = f"👑 {old_bt} (Win)"
-            
+        hit_report["Bạch Thủ"] = f"👑 {old_bt} (Win)" if old_bt in current_loto_2s else f"{old_bt} (❌)"
         # Đối soát Song Thủ
         if old_st and " - " in old_st:
             st_parts = [n.strip() for n in old_st.split("-")]
             found_st = [n for n in st_parts if n in current_loto_2s]
-            if len(found_st) > 0:
-                hit_report["Song Thủ"] = f"👑 {','.join(found_st)} (Win)"
-            else:
-                hit_report["Song Thủ"] = f"{old_st} (❌)"
+            hit_report["Song Thủ"] = f"👑 {','.join(found_st)} (Win)" if found_st else f"{old_st} (❌)"
         else:
             hit_report["Song Thủ"] = "Trống"
-            
-        # Đối soát Dàn 6 con 3 Càng đích danh
-        win_3c_found = [num_3c for num_3c in old_l3c if num_3c in current_cang_3s]
-        if len(win_3c_found) > 0:
-            hit_report["3 Càng"] = f"👑 {','.join(win_3c_found)} (Win)"
-        else:
-            hit_report["3 Càng"] = f"{'-'.join(old_l3c) if old_l3c else 'Trống'} (❌)"
-            
-        # Trả trạng thái Result tổng quát
-        if old_bt and old_bt in current_loto_2s:
-            hit_report["Result"] = "🔥 Win BT 🔥"
-        elif old_st and any(n.strip() in current_loto_2s for n in old_st.split("-")):
-            hit_report["Result"] = "🎯 Win Song Thủ"
-        elif len(win_3c_found) > 0:
-            hit_report["Result"] = "💎ĐẠI THẮNG 3 CÀNG"
-        else:
-            hit_report["Result"] = "❌ Loss"
+        # Đối soát 3 Càng đích danh
+        win_3c_found = [n for n in old_l3c if n in current_cang_3s]
+        hit_report["3 Càng"] = f"👑 {','.join(win_3c_found)} (Win)" if win_3c_found else f"{'-'.join(old_l3c) if old_l3c else 'Trống'} (❌)"
+        
+        # Result tổng hợp hiển thị màu sắc lịch sử
+        if old_bt and old_bt in current_loto_2s: hit_report["Result"] = "🔥 Win BT 🔥"
+        elif old_st and any(n.strip() in current_loto_2s for n in old_st.split("-")): hit_report["Result"] = "🎯 Win Song Thủ"
+        elif win_3c_found: hit_report["Result"] = "💎ĐẠI THẮNG 3 CÀNG"
+        else: hit_report["Result"] = "❌ Loss"
 
-    # Lưu mảng thô động phục vụ dệt lưới
+    # Gắn thẻ dữ liệu thô vào lịch sử để làm bàn đạp tính toán chuỗi tịnh tiến
     hit_report["Saved_Loto_2S"] = current_loto_2s
     hit_report["Saved_Cang_3S"] = current_cang_3s
 
-    # --- 🔄 BỘ NÃO AI DỆT LƯỚI TỔ HỢP MẠNG NHỆN (TÍCH LŨY DATA) ---
+    # --- 🔄 BỘ NÃO AI DỆT LƯỚI TỔ HỢP MẠNG NHỆN ABC (TÍCH LŨY DATA) ---
     if total_history_count >= 3:
         try:
-            # 1. Học tổ hợp chéo 2 số (27 x 27 x 27)
             list_A_2s = db['history'][2].get("Saved_Loto_2S", [])
             list_B_2s = db['history'][1].get("Saved_Loto_2S", [])
             list_C_2s = db['history'][0].get("Saved_Loto_2S", [])
@@ -135,7 +118,6 @@ def process_matrix(gdb_val, raw_full_list):
                             for hit in current_loto_2s:
                                 db["loto_2s_memory"][key_2s][hit] += 1
                                 
-            # 2. Học tổ hợp chéo 3 số đích danh (23 x 23 x 23)
             list_A_3c = db['history'][2].get("Saved_Cang_3S", [])
             list_B_3c = db['history'][1].get("Saved_Cang_3S", [])
             list_C_3c = db['history'][0].get("Saved_Cang_3S", [])
@@ -152,10 +134,11 @@ def process_matrix(gdb_val, raw_full_list):
         except:
             pass
 
-    # --- 🎯 PHẦN AI QUÉT KHÓA TỔ HỢP ĐƯA RA DỰ ĐOÁN CHO KỲ TIẾP THEO ---
+    # Đưa kết quả hiện tại vào đầu hàng danh sách lịch sử
     db['history'].insert(0, hit_report)
     updated_history_count = len(db['history'])
 
+    # --- ⚡ 🎯 THUẬT TOÁN TURBO O(1): TRA CỨU BĂNG TỪ ĐIỂN TỐC ĐỘ ÁNH SÁNG ---
     if updated_history_count < 3:
         db["last_predictions"] = {"bach_thu": "", "song_thu": "", "loto_3c": []}
     else:
@@ -163,42 +146,38 @@ def process_matrix(gdb_val, raw_full_list):
         pred_3c_scores = {}
         
         try:
-            # Tra cứu khóa tổ hợp 2 số cho tương lai dựa trên 3 ngày gần nhất
-            fut_A_2s = db['history'][2].get("Saved_Loto_2S", [])
-            fut_B_2s = db['history'][1].get("Saved_Loto_2S", [])
-            fut_C_2s = current_loto_2s
+            # Lấy mảng 3 ngày gần nhất làm khuôn mẫu tính dải tương lai
+            fut_A_2s = set(db['history'][2].get("Saved_Loto_2S", []))
+            fut_B_2s = set(db['history'][1].get("Saved_Loto_2S", []))
+            fut_C_2s = set(current_loto_2s)
             
-            for a in set(fut_A_2s):
-                for b in set(fut_B_2s):
-                    for c in set(fut_C_2s):
-                        f_key_2s = f"{a}_{b}_{c}"
-                        if f_key_2s in db["loto_2s_memory"]:
-                            for n_key, v_val in db["loto_2s_memory"][f_key_2s].items():
-                                pred_2s_scores[n_key] += v_val
-                                
-            # Tra cứu khóa tổ hợp 3 số cho tương lai dựa trên 3 ngày gần nhất
-            fut_A_3c = db['history'][2].get("Saved_Cang_3S", [])
-            fut_B_3c = db['history'][1].get("Saved_Cang_3S", [])
-            fut_C_3c = current_cang_3s
+            # KỸ THUẬT TURBO 2 SỐ: Chỉ bốc các khóa giao thoa thực tế tồn tại trong bộ nhớ từ điển, đập tan 3 vòng lặp for mù quáng
+            available_keys_2s = db["loto_2s_memory"].keys()
+            for key in available_keys_2s:
+                parts = key.split("_")
+                if parts[0] in fut_A_2s and parts[1] in fut_B_2s and parts[2] in fut_C_2s:
+                    for n_key, v_val in db["loto_2s_memory"][key].items():
+                        pred_2s_scores[n_key] += v_val
+                        
+            # KỸ THUẬT TURBO 3 SỐ: Quét băm từ điển tốc độ ánh sáng cho hệ ma trận 3 càng
+            fut_A_3c = set(db['history'][2].get("Saved_Cang_3S", []))
+            fut_B_3c = set(db['history'][1].get("Saved_Cang_3S", []))
+            fut_C_3c = set(current_cang_3s)
             
-            for a in set(fut_A_3c):
-                for b in set(fut_B_3c):
-                    for c in set(fut_C_3c):
-                        f_key_3c = f"{a}_{b}_{c}"
-                        if f_key_3c in db["cang_3s_memory"]:
-                            for n_key, v_val in db["cang_3s_memory"][f_key_3c].items():
-                                pred_3c_scores[n_key] = pred_3c_scores.get(n_key, 0) + v_val
+            available_keys_3c = db["cang_3s_memory"].keys()
+            for key in available_keys_3c:
+                parts = key.split("_")
+                if parts[0] in fut_A_3c and parts[1] in fut_B_3c and parts[2] in fut_C_3c:
+                    for n_key, v_val in db["cang_3s_memory"][key].items():
+                        pred_3c_scores[n_key] = pred_3c_scores.get(n_key, 0) + v_val
         except:
             pass
 
-        # 1. Nhặt Bạch Thủ
+        # Phân tầng xếp hạng nhả số dự báo
         sorted_2s = sorted(pred_2s_scores.items(), key=lambda x: x[1], reverse=True)
         calculated_bt = sorted_2s[0][0] if sorted_2s[0][1] > 0 else "00"
-        
-        # 2. Nhặt Song Thủ
         calculated_st = f"{sorted_2s[0][0]} - {sorted_2s[1][0]}" if sorted_2s[0][1] > 0 and sorted_2s[1][1] > 0 else "00 - 01"
         
-        # 3. Nhặt TOP 6 CON 3 CÀNG ĐÍCH DANH
         calculated_3c_list = []
         if pred_3c_scores:
             sorted_3c = sorted(pred_3c_scores.items(), key=lambda x: x[1], reverse=True)
@@ -214,8 +193,8 @@ def process_matrix(gdb_val, raw_full_list):
             "loto_3c": calculated_3c_list
         }
 
-# --- 5. GIAO DIỆN CHÍNH STREAMLIT MOBILE V20.1 ---
-st.markdown("<h2 style='text-align: center; color: #E2E8F0; font-weight: bold; font-size: 1.5rem;'>⚡ MATRIX MASTER V20.1</h2>", unsafe_allow_html=True)
+# --- 5. GIAO DIỆN STREAMLIT MOBILE V21.0 CHUẨN SẠCH ---
+st.markdown("<h2 style='text-align: center; color: #E2E8F0; font-weight: bold; font-size: 1.5rem;'>⚡ MATRIX MASTER V21.0</h2>", unsafe_allow_html=True)
 
 with st.sidebar:
     st.markdown("### 💾 DATA SYSTEM")
@@ -225,7 +204,7 @@ with st.sidebar:
         check_and_fix_db_structure()
         st.rerun()
     if st.session_state['db'].get('history'):
-        st.download_button("💾 XUẤT FILE JSON", json.dumps(st.session_state['db']), "combinatorial_v201.json")
+        st.download_button("💾 XUẤT FILE JSON", json.dumps(st.session_state['db']), "combinatorial_v210.json")
     
     st.divider()
     st.markdown("### 📸 OCR CAMERA")
@@ -242,7 +221,7 @@ with st.sidebar:
     st.session_state['raw_input'] = st.text_area("Bảng kết quả thô (Nhập đủ 27 giải):", value=st.session_state.get('raw_input', ""), height=100)
     gdb_val = st.text_input("Đặc biệt (2 số):", value=st.session_state.get('gdb_ocr', ""), max_chars=2)
 
-    if st.button("🔥 CHẠY SNIPER TỔ HỢP ABC", type="primary"):
+    if st.button("🔥 CHẠY SNIPER TURBO ABC", type="primary"):
         raw = [x.strip() for x in st.session_state['raw_input'].replace(",", " ").split() if x]
         if len(raw) >= 27:
             process_matrix(gdb_val, raw)
@@ -251,7 +230,7 @@ with st.sidebar:
             st.error("Yêu cầu nhập tối thiểu đủ 27 con số kết quả!")
     st.button("🚨 XÓA BẢNG TẠM", on_click=lambda: st.session_state.clear())
 
-# --- BẢNG HIỂN THỊ KẾT QUẢ DỰ ĐOÁN KỲ TIẾP THEO ---
+# --- BẢNG HIỂN THỊ DỰ ĐOÁN KỲ TIẾP THEO ---
 st.markdown("<h3><font color='#FF1E27'><b>🎯 TỌA ĐỘ PHÁT LỰC</b></font></h3>", unsafe_allow_html=True)
 st.markdown("<hr style='border: 1px solid #FF1E27; margin-top: -5px; margin-bottom: 15px;'>", unsafe_allow_html=True)
 
@@ -260,7 +239,7 @@ hist_len = len(st.session_state['db']['history'])
 preds = st.session_state['db'].get("last_predictions", {"bach_thu": "", "song_thu": "", "loto_3c": []})
 
 if hist_len < 3:
-    st.warning(f"⚙️ HỆ THỐNG ĐANG TRONG GIAI ĐOẠN KHỞI TẠO MA TRẬN ({hist_len}/3 kỳ). Vui lòng tiếp tục nhập dữ liệu thô để kích hoạt bộ não tổ hợp ABC!")
+    st.warning(f"⚙️ HỆ THỐNG ĐANG TRONG GIAI ĐOẠN KHỞI TẠO MA TRẬN ({hist_len}/3 kỳ). Vui lòng tiếp tục nạp dữ liệu thô để kích hoạt bộ não tổ hợp ABC!")
 else:
     bt_num = preds.get("bach_thu", "")
     st_num = preds.get("song_thu", "")
