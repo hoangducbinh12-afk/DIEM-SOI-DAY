@@ -6,9 +6,10 @@ import easyocr
 from PIL import Image
 
 # --- 1. CẤU HÌNH HỆ THỐNG MÀN HÌNH ---
-st.set_page_config(page_title="Matrix V13.8 - SDI Reborn", layout="wide")
+st.set_page_config(page_title="Matrix V14.0 - Ultimate Shield", layout="wide")
 TOTAL_POS = 107 
 
+# Custom CSS chuẩn Mobile: Tiêu đề dòng TO/ĐẬM - Số THU NHỎ vừa vặn, sang trọng
 st.markdown("""
     <style>
     .main { background-color: #0A0D14; padding: 10px; }
@@ -82,7 +83,7 @@ def update_statistics(current_loto):
             db['gan_tracker'][num] += 1
             db['bet_tracker'][num] = 0
 
-# --- GIỮ NGUYÊN 100% THUẬT TOÁN RA DÀN GỐC V9.4.7 ---
+# --- GIỮ NGUYÊN 100% THUẬT TOÁN RA DÀN GỐC V9.4.7 AN TOÀN ---
 def get_filtered_power_score_4(new_wire_scores, current_digits):
     check_and_fix_db_structure()
     db = st.session_state['db']
@@ -237,7 +238,8 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
     calculated_4 = get_filtered_power_score_4(new_wire_scores, current_digits)
     db['core_four'] = calculated_4
     
-    # --- 🧠 THUẬT TOÁN SDI CẢI TIẾN VÁ LỖI PHÁ BĂNG 00-01 ---
+    # --- 🧠 ⚔️ THUẬT TOÁN SDI CẢI TIẾN VÁ LỖI PHÁ BĂNG 00-01 (ĐÃ VÁ LỖI ĐỊNH NGHĨA BIẾN) ---
+    total_history_count = len(db['history'])  # <--- SỬA LỖI: Đã khai báo biến chuẩn đét ở đây vcl!
     sdi_map = {}
     has_real_sdi = False
     
@@ -272,7 +274,6 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
         except:
             pass
 
-    # Nếu không có dữ liệu chuỗi SDI, gán tất cả bằng 0.0 thay vì 1.0 để nhận diện
     if not has_real_sdi:
         sdi_map = {str(i).zfill(2): 0.0 for i in range(100)}
 
@@ -325,13 +326,12 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
         db['bach_thu'] = max(bt_scores, key=bt_scores.get)
         db['loto_3c'] = temp_3c_list
         
-        # 🛠️ CƠ CHẾ KHÓA CHẶN FALLBACK CHO SONG THỦ: PHÁ TAN BĂNG 00-01
+        # CƠ CHẾ KHÓA CHẶN FALLBACK CHO SONG THỦ CỦA V13.8 CHUẨN CHỈ
         if has_real_sdi:
             sorted_sdi_global = sorted(sdi_map.items(), key=lambda x: x[1], reverse=True)
             valid_st_candidates = [item[0] for item in sorted_sdi_global if db['gan_tracker'][item[0]] <= 12]
             db['song_thu'] = f"{valid_st_candidates[0]} - {valid_st_candidates[1]}"
         else:
-            # Nếu chưa đủ dữ liệu chuỗi SDI, lấy thẳng con nhiều điểm thứ 1 và thứ 2 của dàn gốc V9.4.7 làm Song Thủ
             db['song_thu'] = f"{calculated_4[0]} - {calculated_4[1]}"
     else:
         db['bach_thu'] = ""
@@ -340,8 +340,8 @@ def process_matrix(current_digits, current_loto, gdb_val, raw_full_list):
         
     db['history'].insert(0, hit_report)
 
-# --- 4. GIAO DIỆN CHÍNH STREAMLIT MOBILE V13.8 ---
-st.markdown("<h2 style='text-align: center; color: #E2E8F0; font-weight: bold; font-size: 1.5rem;'>⚡ MATRIX MASTER V13.8</h2>", unsafe_allow_html=True)
+# --- 4. GIAO DIỆN CHÍNH STREAMLIT MOBILE V14.0 ---
+st.markdown("<h2 style='text-align: center; color: #E2E8F0; font-weight: bold; font-size: 1.5rem;'>⚡ MATRIX MASTER V14.0</h2>", unsafe_allow_html=True)
 
 with st.sidebar:
     st.markdown("### 💾 DATA SYSTEM")
@@ -351,7 +351,7 @@ with st.sidebar:
         check_and_fix_db_structure()
         st.rerun()
     if st.session_state['db']['last_digits']:
-        st.download_button("💾 XUẤT FILE JSON", json.dumps(st.session_state['db']), "matrix_v138.json")
+        st.download_button("💾 XUẤT FILE JSON", json.dumps(st.session_state['db']), "matrix_v140.json")
     
     st.divider()
     st.markdown("### 📸 OCR CAMERA")
@@ -375,7 +375,7 @@ with st.sidebar:
             st.rerun()
     st.button("🚨 XÓA BẢNG TẠM", on_click=lambda: st.session_state.clear())
 
-# --- BẢNG DỰ ĐOÁN ---
+# --- BẢNG DỰ ĐOÁN KỲ TIẾP THEO ---
 st.markdown("<h3><font color='#FF1E27'><b>🎯 TỌA ĐỘ PHÁT LỰC</b></font></h3>", unsafe_allow_html=True)
 st.markdown("<hr style='border: 1px solid #FF1E27; margin-top: -5px; margin-bottom: 15px;'>", unsafe_allow_html=True)
 
@@ -414,7 +414,7 @@ with st.expander("🚫 Hệ thống chặn số tự động"):
     st.write(f"**Lô Gan (>12 ngày):** {', '.join(gan_list) if gan_list else 'Trống'}")
     st.write(f"**Lô Bệt (>=2 ngày):** {', '.join(bet_list) if bet_list else 'Trống'}")
 
-# --- BẢNG LỊCH SỬ ---
+# --- BẢNG LỊCH SỬ ĐỐI SOÁT WIN/LOSS HAI TRỤC ---
 st.markdown("<h3><font color='#FF1E27'><b>📋 LỊCH SỬ ĐỐI SOÁT KẾT QUẢ</b></font></h3>", unsafe_allow_html=True)
 st.markdown("<hr style='border: 1px solid #FF1E27; margin-top: -5px; margin-bottom: 15px;'>", unsafe_allow_html=True)
 
