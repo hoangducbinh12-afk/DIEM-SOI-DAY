@@ -3,57 +3,89 @@ import pandas as pd
 import numpy as np
 import json
 
-# --- CẤU HÌNH GIAO DIỆN & STYLE (FULL) ---
-st.set_page_config(page_title="Matrix MN/MT V26.0", layout="wide")
+# --- 1. CẤU HÌNH MIỀN NAM/TRUNG (82 VỊ TRÍ) ---
 TOTAL_POS = 82
+st.set_page_config(page_title="Matrix MN/MT Elite V30.0", layout="wide")
+
+# CSS ĐỎ IN ĐẬM
 st.markdown("""
     <style>
-    .mobile-box-bt { background-color: #05070B; padding: 15px; border-radius: 12px; border: 3px solid #EF4444; text-align: center; }
-    .mobile-box-3 { background-color: #030508; padding: 15px; border-radius: 12px; border: 2px solid #2563EB; text-align: center; }
-    .mobile-box-4 { background-color: #030508; padding: 15px; border-radius: 12px; border: 2px solid #D97706; text-align: center; }
+    .big-title { color: #FF0000; font-weight: 900; font-size: 28px; text-align: center; }
+    .num-box { color: #FF0000; font-weight: 900; font-size: 30px; text-align: center; 
+               border: 3px solid #FF0000; padding: 10px; margin: 5px; border-radius: 8px; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- ENGINE LƯU TRỮ & XỬ LÝ ---
+# --- 2. HÀM HỌC MA TRẬN (ĐÃ FIX 82 VỊ TRÍ) ---
+def update_matrix(nums, gdb):
+    db = st.session_state['db']
+    wire = np.array(db["wire_scores"])
+    break_m = np.array(db["break_matrix"])
+    loto_current = [n[-2:] for n in nums]
+
+    # Học ma trận với 82 vị trí
+    for i in range(TOTAL_POS):
+        for j in range(TOTAL_POS):
+            coord_num = str((i + j) % 100).zfill(2)
+            if coord_num in loto_current:
+                wire[i][j] += 1
+            else:
+                break_m[i][j] += 1
+                
+    db["wire_scores"] = wire.tolist()
+    db["break_matrix"] = break_m.tolist()
+    
+    # Cập nhật Tracker theo thông số đã chốt
+    for i in range(100):
+        num = str(i).zfill(2)
+        if num in loto_current:
+            db['gan_tracker'][num] = 0
+            db['bet_tracker'][num] += 1
+        else:
+            db['gan_tracker'][num] += 1
+            db['bet_tracker'][num] = 0
+
+    # Tính điểm theo tầng sâu (Bộ lọc đã chốt)
+    scores = {}
+    for i in range(100):
+        num = str(i).zfill(2)
+        # Bộ lọc gắt: Gan 16, Bệt >= 3
+        if db['gan_tracker'][num] > 16 or db['bet_tracker'][num] >= 3: continue
+        
+        # Mật độ ánh xạ (Heat 4-12) & Penalty 23
+        hits = np.count_nonzero((np.indices((TOTAL_POS, TOTAL_POS)).sum(axis=0) % 100) == int(num))
+        penalty = 23 if hits > 23 else 0
+        bonus = 15 if 4 <= hits <= 12 else 0
+        
+        scores[num] = (np.sum(wire) * 0.9) - (np.sum(break_m) * 0.5) + bonus - penalty
+        
+    top_4 = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:4]
+    
+    # Lưu lịch sử
+    db['history'].insert(0, {"GĐB": gdb, "BT": top_4[0][0], "ST": top_4[1][0], "TT": top_4[2][0], "T4": top_4[3][0]})
+
+# --- 3. GIAO DIỆN (ĐÚNG FORM 4 Ô ĐỎ) ---
 if 'db' not in st.session_state:
-    st.session_state['db'] = {
-        "wire_scores": np.zeros((TOTAL_POS, TOTAL_POS), dtype=int).tolist(),
-        "history": [], "gan_tracker": {str(i).zfill(2): 0 for i in range(100)}
-    }
+    st.session_state['db'] = {"wire_scores": np.zeros((TOTAL_POS, TOTAL_POS), dtype=int).tolist(), "break_matrix": np.zeros((TOTAL_POS, TOTAL_POS), dtype=int).tolist(), "history": [], "gan_tracker": {str(i).zfill(2): 0 for i in range(100)}, "bet_tracker": {str(i).zfill(2): 0 for i in range(100)}}
 
-def update_db(raw_text, gdb):
-    nums = [n[-2:] for n in raw_text.split() if n.isdigit() and len(n) >= 2]
-    # Lưu vào lịch sử
-    st.session_state['db']['history'].insert(0, {"Ngày": len(st.session_state['db']['history'])+1, "ĐB": gdb, "Full": " ".join(nums)})
-    # Logic học ma trận ở đây (đã rút gọn để hiển thị)
-    return nums
-
-# --- GIAO DIỆN CHÍNH ---
-st.title("⚡ MATRIX V26.0 - ELITE MN/MT")
+st.markdown('<p class="big-title">⚡ MATRIX ELITE MN/MT V30.0</p>', unsafe_allow_html=True)
 
 with st.sidebar:
-    st.subheader("💾 HỆ THỐNG DỮ LIỆU")
-    raw_data = st.text_area("Dán kết quả 18 giải:", height=200)
-    gdb_input = st.text_input("GĐB để đối soát:")
-    if st.button("🚀 CHẠY SNIPER"):
-        if update_db(raw_data, gdb_input): st.rerun()
-    
-    st.divider()
-    # Nút xuất nhập JSON
-    json_data = json.dumps(st.session_state['db'])
-    st.download_button("💾 XUẤT JSON", json_data, "matrix_data.json")
-    st.file_uploader("📥 NẠP JSON", type=['json'])
+    raw = st.text_area("Dán 18 giải (MN/MT):", height=200)
+    gdb = st.text_input("GĐB:")
+    if st.button("🚀 XỬ LÝ MA TRẬN"):
+        if len(raw.split()) >= 18:
+            update_matrix(raw.split(), gdb)
+            st.rerun()
 
-# --- HIỂN THỊ KẾT QUẢ ---
-# Giả lập 4 con cao điểm nhất: Bạch, Song, Tam, Tứ
-dàn = ["86", "24", "79", "51"] 
-
-col1, col2, col3, col4 = st.columns(4)
-col1.markdown(f'<div class="mobile-box-bt">BẠCH THỦ<br><h1>{dàn[0]}</h1></div>', unsafe_allow_html=True)
-col2.markdown(f'<div class="mobile-box-3">SONG THỦ<br><h1>{dàn[1]}</h1></div>', unsafe_allow_html=True)
-col3.markdown(f'<div class="mobile-box-3">TAM THỦ<br><h1>{dàn[2]}</h1></div>', unsafe_allow_html=True)
-col4.markdown(f'<div class="mobile-box-4">TỨ THỦ<br><h1>{dàn[3]}</h1></div>', unsafe_allow_html=True)
+# Hiển thị 4 ô Đỏ
+history = st.session_state['db']['history']
+dàn = history[0] if history else {"BT":"--","ST":"--","TT":"--","T4":"--"}
+cols = st.columns(4)
+labels = ["BẠCH THỦ", "SONG THỦ", "TAM THỦ", "TỨ THỦ"]
+keys = ["BT", "ST", "TT", "T4"]
+for i in range(4):
+    cols[i].markdown(f'<div class="num-box">{labels[i]}<br>{dàn[keys[i]]}</div>', unsafe_allow_html=True)
 
 st.subheader("📋 LỊCH SỬ ĐỐI SOÁT")
-if st.session_state['db']['history']:
-    st.table(pd.DataFrame(st.session_state['db']['history']))
+st.table(pd.DataFrame(history))
