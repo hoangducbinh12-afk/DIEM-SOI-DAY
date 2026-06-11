@@ -1,64 +1,75 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import json
 
-# --- CẤU HÌNH ---
+# --- 1. CẤU HÌNH & KHỞI TẠO ---
 TOTAL_POS = 82
 st.set_page_config(layout="wide")
 
-# --- KHỞI TẠO DB CHUẨN ---
-if 'db' not in st.session_state:
-    st.session_state['db'] = {
-        "history": [],
+def init_db():
+    return {
         "wire_scores": np.zeros((TOTAL_POS, TOTAL_POS), dtype=int).tolist(),
-        "break_matrix": np.zeros((TOTAL_POS, TOTAL_POS), dtype=int).tolist()
+        "break_matrix": np.zeros((TOTAL_POS, TOTAL_POS), dtype=int).tolist(),
+        "history": [], "core_four": ["--", "--", "--", "--"]
     }
 
-# --- ENGINE TÍNH TOÁN & ĐỐI SOÁT ---
-def run_full_logic(raw_text, gdb):
+if 'db' not in st.session_state:
+    st.session_state['db'] = init_db()
+
+# --- 2. ENGINE LOGIC (ĐỦ CÁC VÒNG TÍNH TOÁN) ---
+def run_logic(raw_text, gdb):
     db = st.session_state['db']
     nums = [n[-2:] for n in raw_text.split() if n.isdigit() and len(n) >= 2]
     if len(nums) < 18: return
     
-    # 1. HỌC MA TRẬN
     wire = np.array(db["wire_scores"])
+    break_m = np.array(db["break_matrix"])
+    
+    # Học ma trận
     for i in range(TOTAL_POS):
         for j in range(TOTAL_POS):
-            if str((i + j) % 100).zfill(2) in nums: wire[i][j] += 1
+            coord = str((i + j) % 100).zfill(2)
+            if coord in nums: wire[i][j] += 1
+            else: break_m[i][j] += 1
+            
     db["wire_scores"] = wire.tolist()
+    db["break_matrix"] = break_m.tolist()
     
-    # 2. DỰ ĐOÁN (Giả lập TOP 4)
-    # Lấy các số có wire_score cao nhất
-    scores = {str(i).zfill(2): np.sum(wire[i]) for i in range(100)}
+    # Tính điểm & Chọn 4 con
+    scores = {str(i).zfill(2): np.sum(wire[i]) - np.sum(break_m[i]) for i in range(100)}
     top4 = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:4]
-    bt, st, tt, t4 = [x[0] for x in top4]
     
-    # 3. ĐỐI SOÁT TRÚNG/TRƯỢT
-    last_dàn = db['history'][0] if db['history'] else {"BT": "--", "ST": "--", "TT": "--", "T4": "--"}
-    result = "❌ TRƯỢT"
-    if gdb in [last_dàn['BT'], last_dàn['ST'], last_dàn['TT'], last_dàn['T4']]:
-        result = "🔥 TRÚNG"
-    
-    # 4. LƯU LỊCH SỬ
-    db['history'].insert(0, {"GĐB": gdb, "BT": bt, "ST": st, "TT": tt, "T4": t4, "Kết Quả": result})
+    # Đối soát
+    res = "🔥 TRÚNG" if gdb in [x[0] for x in top4] else "❌ TRƯỢT"
+    db['core_four'] = [x[0] for x in top4]
+    db['history'].insert(0, {"GĐB": gdb, "BT": top4[0][0], "ST": top4[1][0], "TT": top4[2][0], "T4": top4[3][0], "Kết quả": res})
 
-# --- GIAO DIỆN ---
-st.markdown("<h1 style='color:red; text-align:center;'>MATRIX V32.0 - MN/MT</h1>", unsafe_allow_html=True)
+# --- 3. GIAO DIỆN (ĐỦ NÚT LOAD/EXPORT/RESET) ---
+st.markdown("<h1 style='color:red; text-align:center;'>MATRIX V33.0 - BẢN ĐỦ</h1>", unsafe_allow_html=True)
 
 with st.sidebar:
+    st.subheader("⚙️ HỆ THỐNG")
     raw = st.text_area("Dán 18 giải:", height=150)
     gdb = st.text_input("GĐB:")
-    if st.button("RUN SNIPER"):
-        run_full_logic(raw, gdb)
+    if st.button("🚀 CHẠY SNIPER"):
+        run_logic(raw, gdb)
+        st.rerun()
+    
+    # Nạp/Xuất
+    file = st.file_uploader("Nạp JSON", type=['json'])
+    if file: st.session_state['db'] = json.load(file)
+    st.download_button("💾 XUẤT JSON", json.dumps(st.session_state['db']), "matrix.json")
+    
+    if st.button("🚨 RESET TẤT CẢ"):
+        st.session_state['db'] = init_db()
         st.rerun()
 
-# Hiển thị 4 ô Đỏ
-dàn = st.session_state['db']['history'][0] if st.session_state['db']['history'] else {"BT":"--","ST":"--","TT":"--","T4":"--"}
+# Hiển thị 4 ô
+dàn = st.session_state['db']['core_four']
 cols = st.columns(4)
-labels = ["BT", "SONG THỦ", "TAM THỦ", "TỨ THỦ"]
-keys = ["BT", "ST", "TT", "T4"]
+titles = ["BT", "SONG THỦ", "TAM THỦ", "TỨ THỦ"]
 for i in range(4):
-    cols[i].markdown(f"<div style='border:3px solid red; color:red; text-align:center; padding:15px; font-size:30px; font-weight:900;'>{labels[i]}<br>{dàn[keys[i]]}</div>", unsafe_allow_html=True)
+    cols[i].markdown(f"<div style='border:3px solid red; color:red; text-align:center; padding:15px; font-weight:900; font-size:25px;'>{titles[i]}<br>{dàn[i]}</div>", unsafe_allow_html=True)
 
-st.subheader("📋 LỊCH SỬ ĐỐI SOÁT")
 st.table(pd.DataFrame(st.session_state['db']['history']))
