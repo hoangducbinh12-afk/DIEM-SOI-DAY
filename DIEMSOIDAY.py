@@ -1,75 +1,72 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import json
+import re
 
-# --- 1. CẤU HÌNH & KHỞI TẠO ---
+# --- CẤU HÌNH 82 Ô ---
 TOTAL_POS = 82
 st.set_page_config(layout="wide")
 
-def init_db():
-    return {
-        "wire_scores": np.zeros((TOTAL_POS, TOTAL_POS), dtype=int).tolist(),
-        "break_matrix": np.zeros((TOTAL_POS, TOTAL_POS), dtype=int).tolist(),
-        "history": [], "core_four": ["--", "--", "--", "--"]
+if 'db' not in st.session_state:
+    st.session_state['db'] = {
+        "wire": np.zeros((TOTAL_POS, TOTAL_POS), dtype=int).tolist(),
+        "history": []
     }
 
-if 'db' not in st.session_state:
-    st.session_state['db'] = init_db()
+# --- ENGINE ĐỌC CẤU TRÚC 82 Ô ---
+def parse_mn_mt(raw_text):
+    # Lọc tất cả các cụm số
+    all_nums = re.findall(r'\d{2,6}', raw_text)
+    if len(all_nums) < 18: 
+        st.error("Dữ liệu không đủ 18 giải!")
+        return None, None
 
-# --- 2. ENGINE LOGIC (ĐỦ CÁC VÒNG TÍNH TOÁN) ---
-def run_logic(raw_text, gdb):
+    # Theo cấu trúc MN: Giải 8 (2 số) thường là số đầu tiên, GĐB (6 số) là số cuối/giữa
+    # Ở đây ta lấy theo quy ước: all_nums[0] là G8, all_nums[-1] là GĐB
+    gdb = all_nums[-1] 
+    loto_list = [n[-2:] for n in all_nums] # Lấy 2 số cuối của tất cả các giải
+    
+    return loto_list, gdb
+
+def run_logic(raw_text, gdb_input):
     db = st.session_state['db']
-    nums = [n[-2:] for n in raw_text.split() if n.isdigit() and len(n) >= 2]
-    if len(nums) < 18: return
+    loto_list, gdb_extracted = parse_mn_mt(raw_text)
+    gdb = gdb_input if gdb_input else gdb_extracted
     
-    wire = np.array(db["wire_scores"])
-    break_m = np.array(db["break_matrix"])
-    
-    # Học ma trận
+    if not loto_list: return
+
+    # Học ma trận 82 ô
+    wire = np.array(db["wire"])
     for i in range(TOTAL_POS):
         for j in range(TOTAL_POS):
             coord = str((i + j) % 100).zfill(2)
-            if coord in nums: wire[i][j] += 1
-            else: break_m[i][j] += 1
+            if coord in loto_list: wire[i][j] += 1
             
-    db["wire_scores"] = wire.tolist()
-    db["break_matrix"] = break_m.tolist()
+    db["wire"] = wire.tolist()
     
-    # Tính điểm & Chọn 4 con
-    scores = {str(i).zfill(2): np.sum(wire[i]) - np.sum(break_m[i]) for i in range(100)}
+    # Tính toán dàn 4 số
+    scores = {str(i).zfill(2): np.sum(wire[i]) for i in range(100)}
     top4 = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:4]
     
     # Đối soát
-    res = "🔥 TRÚNG" if gdb in [x[0] for x in top4] else "❌ TRƯỢT"
-    db['core_four'] = [x[0] for x in top4]
+    res = "🔥 TRÚNG" if gdb[-2:] in [x[0] for x in top4] else "❌ TRƯỢT"
     db['history'].insert(0, {"GĐB": gdb, "BT": top4[0][0], "ST": top4[1][0], "TT": top4[2][0], "T4": top4[3][0], "Kết quả": res})
 
-# --- 3. GIAO DIỆN (ĐỦ NÚT LOAD/EXPORT/RESET) ---
-st.markdown("<h1 style='color:red; text-align:center;'>MATRIX V33.0 - BẢN ĐỦ</h1>", unsafe_allow_html=True)
+# --- GIAO DIỆN ---
+st.markdown("<h1 style='color:red; text-align:center;'>MATRIX V36.0 - CẤU TRÚC 82 Ô</h1>", unsafe_allow_html=True)
 
 with st.sidebar:
-    st.subheader("⚙️ HỆ THỐNG")
-    raw = st.text_area("Dán 18 giải:", height=150)
-    gdb = st.text_input("GĐB:")
-    if st.button("🚀 CHẠY SNIPER"):
-        run_logic(raw, gdb)
-        st.rerun()
-    
-    # Nạp/Xuất
-    file = st.file_uploader("Nạp JSON", type=['json'])
-    if file: st.session_state['db'] = json.load(file)
-    st.download_button("💾 XUẤT JSON", json.dumps(st.session_state['db']), "matrix.json")
-    
-    if st.button("🚨 RESET TẤT CẢ"):
-        st.session_state['db'] = init_db()
+    raw = st.text_area("Dán bảng kết quả:", height=200)
+    gdb_in = st.text_input("Nhập GĐB (nếu muốn đối soát):")
+    if st.button("🚀 CHẠY CẤU TRÚC MN"):
+        run_logic(raw, gdb_in)
         st.rerun()
 
 # Hiển thị 4 ô
-dàn = st.session_state['db']['core_four']
-cols = st.columns(4)
-titles = ["BT", "SONG THỦ", "TAM THỦ", "TỨ THỦ"]
-for i in range(4):
-    cols[i].markdown(f"<div style='border:3px solid red; color:red; text-align:center; padding:15px; font-weight:900; font-size:25px;'>{titles[i]}<br>{dàn[i]}</div>", unsafe_allow_html=True)
+if st.session_state['db']['history']:
+    dàn = st.session_state['db']['history'][0]
+    cols = st.columns(4)
+    for i, key in enumerate(["BT", "ST", "TT", "T4"]):
+        cols[i].markdown(f"<div style='border:3px solid red; color:red; padding:15px; text-align:center; font-weight:900;'>{key}<br><span style='font-size:30px;'>{dàn[key]}</span></div>", unsafe_allow_html=True)
 
 st.table(pd.DataFrame(st.session_state['db']['history']))
